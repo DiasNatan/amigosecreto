@@ -184,30 +184,35 @@ onValue(ref(database, 'participantes'), (snapshot) => {
 // ==========================================
 
 function realizarSorteio(participantes) {
-    const nomes = Object.keys(participantes);
-    const n = nomes.length;
+    // Converter objeto de participantes para array com IDs
+    const participantesArray = Object.entries(participantes).map(([id, dados]) => ({
+        id: id,
+        ...dados
+    }));
+    
+    const n = participantesArray.length;
     
     if (n < 2) {
         throw new Error('É necessário pelo menos 2 participantes para o sorteio!');
     }
 
-    let sorteados = [...nomes];
     let tentativas = 0;
     const maxTentativas = 100;
     
     while (tentativas < maxTentativas) {
-        sorteados = [...nomes];
+        // Criar cópia embaralhada dos índices
+        let indices = [...Array(n).keys()];
         
         // Embaralhamento Fisher-Yates
-        for (let i = sorteados.length - 1; i > 0; i--) {
+        for (let i = indices.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [sorteados[i], sorteados[j]] = [sorteados[j], sorteados[i]];
+            [indices[i], indices[j]] = [indices[j], indices[i]];
         }
         
         // Verificar se ninguém tirou a si mesmo
         let valido = true;
         for (let i = 0; i < n; i++) {
-            if (nomes[i] === sorteados[i]) {
+            if (i === indices[i]) {
                 valido = false;
                 break;
             }
@@ -218,17 +223,29 @@ function realizarSorteio(participantes) {
             const codigos = {};
             
             for (let i = 0; i < n; i++) {
+                const participante = participantesArray[i];
+                const amigoSecreto = participantesArray[indices[i]];
                 const codigo = gerarCodigo();
-                resultado[nomes[i]] = {
-                    tirouNome: sorteados[i],
-                    dadosAmigo: participantes[sorteados[i]],
+                
+                resultado[participante.nome] = {
+                    tirouNome: amigoSecreto.nome,
+                    dadosAmigo: {
+                        nome: amigoSecreto.nome,
+                        whatsapp: amigoSecreto.whatsapp,
+                        sugestoes: amigoSecreto.sugestoes
+                    },
                     codigo: codigo
                 };
+                
                 // Criar índice por código para consulta rápida
                 codigos[codigo] = {
-                    participante: nomes[i],
-                    tirouNome: sorteados[i],
-                    dadosAmigo: participantes[sorteados[i]]
+                    participante: participante.nome,
+                    tirouNome: amigoSecreto.nome,
+                    dadosAmigo: {
+                        nome: amigoSecreto.nome,
+                        whatsapp: amigoSecreto.whatsapp,
+                        sugestoes: amigoSecreto.sugestoes
+                    }
                 };
             }
             return { resultado, codigos };
