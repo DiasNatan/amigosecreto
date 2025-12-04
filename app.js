@@ -59,6 +59,16 @@ function formatPhone(value) {
     return value;
 }
 
+// Gerar código único de 6 caracteres
+function gerarCodigo() {
+    const caracteres = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let codigo = '';
+    for (let i = 0; i < 6; i++) {
+        codigo += caracteres.charAt(Math.floor(Math.random() * caracteres.length));
+    }
+    return codigo;
+}
+
 // ==========================================
 // CONTAGEM REGRESSIVA
 // ==========================================
@@ -146,7 +156,7 @@ document.getElementById('inscricaoForm').addEventListener('submit', async functi
 });
 
 // ==========================================
-// CARREGAR PARTICIPANTES
+// CARREGAR PARTICIPANTES (APENAS NOMES)
 // ==========================================
 
 onValue(ref(database, 'participantes'), (snapshot) => {
@@ -160,8 +170,7 @@ onValue(ref(database, 'participantes'), (snapshot) => {
         
         listaDiv.innerHTML = participantes.map(p => `
             <div class="participante-item">
-                <strong>👤 ${p.nome}</strong><br>
-                📱 ${p.whatsapp}
+                <strong>👤 ${p.nome}</strong>
             </div>
         `).join('');
     } else {
@@ -171,7 +180,7 @@ onValue(ref(database, 'participantes'), (snapshot) => {
 });
 
 // ==========================================
-// ALGORITMO DE SORTEIO
+// ALGORITMO DE SORTEIO (COM CÓDIGOS)
 // ==========================================
 
 function realizarSorteio(participantes) {
@@ -206,13 +215,23 @@ function realizarSorteio(participantes) {
         
         if (valido) {
             const resultado = {};
+            const codigos = {};
+            
             for (let i = 0; i < n; i++) {
+                const codigo = gerarCodigo();
                 resultado[nomes[i]] = {
+                    tirouNome: sorteados[i],
+                    dadosAmigo: participantes[sorteados[i]],
+                    codigo: codigo
+                };
+                // Criar índice por código para consulta rápida
+                codigos[codigo] = {
+                    participante: nomes[i],
                     tirouNome: sorteados[i],
                     dadosAmigo: participantes[sorteados[i]]
                 };
             }
-            return resultado;
+            return { resultado, codigos };
         }
         
         tentativas++;
@@ -222,7 +241,7 @@ function realizarSorteio(participantes) {
 }
 
 // ==========================================
-// BOTÃO DE SORTEAR
+// BOTÃO DE SORTEAR (COM CÓDIGOS)
 // ==========================================
 
 document.getElementById('btnSortear').addEventListener('click', async function() {
@@ -248,15 +267,17 @@ document.getElementById('btnSortear').addEventListener('click', async function()
             return;
         }
 
-        const resultado = realizarSorteio(participantes);
+        const { resultado, codigos } = realizarSorteio(participantes);
         
+        // Salvar resultado e códigos no Firebase
         await set(ref(database, 'sorteio'), {
             resultado: resultado,
+            codigos: codigos,
             dataSorteio: new Date().toISOString()
         });
         
         showLoading(false);
-        showAlert('🎲 Sorteio realizado com sucesso! Clique em "Ver Resultado" para visualizar.', 'success');
+        showAlert('🎲 Sorteio realizado com sucesso! Os códigos foram gerados. Clique em "Ver Resultado" para visualizar.', 'success');
         createConfetti();
         
     } catch (error) {
@@ -267,7 +288,7 @@ document.getElementById('btnSortear').addEventListener('click', async function()
 });
 
 // ==========================================
-// VER RESULTADO DO SORTEIO
+// VER RESULTADO DO SORTEIO (ADMIN - COM CÓDIGOS)
 // ==========================================
 
 document.getElementById('btnVerSorteio').addEventListener('click', async function() {
@@ -297,11 +318,15 @@ document.getElementById('btnVerSorteio').addEventListener('click', async functio
         const resultadoDiv = document.getElementById('resultadoSorteio');
         
         let html = '<h4 style="color: var(--cor-detalhe); margin-top: 20px;">📋 Resultado do Sorteio:</h4>';
+        html += '<p style="color: #666; margin-bottom: 15px;"><strong>⚠️ Atenção:</strong> Envie os códigos individualmente para cada participante via WhatsApp!</p>';
         
         for (const [pessoa, dados] of Object.entries(resultado)) {
             html += `
                 <div class="sorteio-resultado">
-                    <strong>🎁 ${pessoa}</strong> tirou <strong style="color: var(--cor-acento);">${dados.tirouNome}</strong><br>
+                    <strong>👤 ${pessoa}</strong><br>
+                    <strong style="color: #4CAF50;">🔑 Código: ${dados.codigo}</strong><br>
+                    <hr style="margin: 10px 0; border: none; border-top: 1px dashed #ddd;">
+                    Tirou: <strong style="color: var(--cor-acento);">${dados.tirouNome}</strong><br>
                     📱 WhatsApp: ${dados.dadosAmigo.whatsapp}<br>
                     💭 Sugestões: ${dados.dadosAmigo.sugestoes}
                 </div>
@@ -310,13 +335,82 @@ document.getElementById('btnVerSorteio').addEventListener('click', async functio
         
         resultadoDiv.innerHTML = html;
         showLoading(false);
-        showAlert('Resultado carregado! Role para baixo para ver.', 'success');
+        showAlert('Resultado carregado! Envie os códigos para cada participante.', 'success');
         
     } catch (error) {
         showLoading(false);
         showAlert('Erro ao carregar resultado: ' + error.message, 'error');
         console.error(error);
     }
+});
+
+// ==========================================
+// CONSULTAR AMIGO SECRETO (PARTICIPANTE)
+// ==========================================
+
+document.getElementById('btnConsultar').addEventListener('click', async function() {
+    const codigo = document.getElementById('codigoConsulta').value.trim().toUpperCase();
+    
+    if (!codigo) {
+        showAlert('Por favor, digite seu código de acesso!', 'error');
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const snapshot = await new Promise((resolve) => {
+            onValue(ref(database, 'sorteio'), resolve, { onlyOnce: true });
+        });
+        
+        const sorteioData = snapshot.val();
+        
+        if (!sorteioData || !sorteioData.codigos) {
+            showLoading(false);
+            showAlert('O sorteio ainda não foi realizado. Aguarde o organizador!', 'info');
+            return;
+        }
+
+        const codigos = sorteioData.codigos;
+        
+        if (!codigos[codigo]) {
+            showLoading(false);
+            showAlert('Código inválido! Verifique se digitou corretamente.', 'error');
+            return;
+        }
+
+        const dados = codigos[codigo];
+        const resultadoDiv = document.getElementById('resultadoConsulta');
+        
+        resultadoDiv.innerHTML = `
+            <div class="resultado-amigo">
+                <h4>🎉 Seu Amigo Secreto é:</h4>
+                <div class="amigo-nome">🎁 ${dados.tirouNome}</div>
+                <div class="amigo-info">
+                    <p><strong>📱 WhatsApp:</strong> ${dados.dadosAmigo.whatsapp}</p>
+                    <p><strong>💭 Sugestões de Presente:</strong></p>
+                    <p>${dados.dadosAmigo.sugestoes}</p>
+                </div>
+                <p style="color: #666; margin-top: 15px; font-size: 0.9em;">
+                    💝 Lembre-se: o presente deve custar entre R$ 20,00 e R$ 30,00. 
+                    Capriche na criatividade!
+                </p>
+            </div>
+        `;
+        
+        showLoading(false);
+        createConfetti();
+        
+    } catch (error) {
+        showLoading(false);
+        showAlert('Erro ao consultar: ' + error.message, 'error');
+        console.error(error);
+    }
+});
+
+// Formatar código em tempo real
+document.getElementById('codigoConsulta').addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase();
 });
 
 // ==========================================
