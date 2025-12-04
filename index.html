@@ -1,0 +1,118 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Amigo Secreto de Ano Novo 2025 da Família</title>
+    
+    <!-- Fontes Google -->
+    <link href="https://fonts.googleapis.com/css2?family=Merriweather:wght@300;400;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+    
+    <!-- CSS -->
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="container">
+        <h1>🎁 Amigo Secreto da Família</h1>
+        <h2>Virada de Ano - 31 de Dezembro de 2025</h2>
+
+        <!-- Contagem Regressiva -->
+        <div class="countdown">
+            <h3>⏰ Faltam apenas:</h3>
+            <div class="countdown-timer">
+                <div class="time-unit">
+                    <span class="number" id="days">00</span>
+                    <span class="label">Dias</span>
+                </div>
+                <div class="time-unit">
+                    <span class="number" id="hours">00</span>
+                    <span class="label">Horas</span>
+                </div>
+                <div class="time-unit">
+                    <span class="number" id="minutes">00</span>
+                    <span class="label">Minutos</span>
+                </div>
+                <div class="time-unit">
+                    <span class="number" id="seconds">00</span>
+                    <span class="label">Segundos</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Mensagem de Informação -->
+        <div class="mensagem-info">
+            <p style="font-weight: 700;">🎉 Detalhes Importantes da Brincadeira 🎉</p>
+            <p>🗓️ <strong>Data:</strong> 31 de Dezembro de 2025, durante nosso Jantar em Família na Virada do Ano.</p>
+            <p>🎁 <strong>Valor do Presente:</strong> Deve ser entre <strong>R$ 20,00 e R$ 30,00</strong>.</p>
+            <p>💡 <strong>Criatividade:</strong> Valorize mais a criatividade e o carinho do que o preço! Surpreenda seu amigo(a)!</p>
+        </div>
+
+        <!-- Alertas -->
+        <div id="alertContainer"></div>
+
+        <!-- Loading -->
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>Processando...</p>
+        </div>
+
+        <!-- Formulário de Inscrição -->
+        <form id="inscricaoForm">
+            <div class="form-group">
+                <label for="nome">👤 Seu Nome Completo:</label>
+                <input type="text" id="nome" name="nome" required placeholder="Ex: João da Silva">
+            </div>
+
+            <div class="form-group">
+                <label for="whatsapp">📱 Telefone WhatsApp:</label>
+                <input type="tel" id="whatsapp" name="whatsapp" required placeholder="Ex: (99) 99999-9999">
+            </div>
+
+            <div class="form-group">
+                <label for="sugestoes">💭 Sugestões de Presente:</label>
+                <textarea id="sugestoes" name="sugestoes" rows="4" required placeholder="Ex: Livros de aventura, chocolates gourmet, vela aromática de baunilha, etc."></textarea>
+            </div>
+
+            <div class="btn-group">
+                <button type="submit" id="btnSubmit">✨ Confirmar Minha Participação!</button>
+            </div>
+        </form>
+
+        <!-- Lista de Participantes -->
+        <div class="participantes-lista" id="participantesLista">
+            <h3>👨‍👩‍👧‍👦 Participantes Confirmados (<span id="totalParticipantes">0</span>)</h3>
+            <div id="listaParticipantes"></div>
+        </div>
+
+        <!-- Painel Administrativo -->
+        <div class="admin-panel">
+            <h3>🔐 Painel do Organizador</h3>
+            <p style="margin-bottom: 15px; color: #666;">
+                <strong>Senha do Organizador:</strong> Use esta área para realizar o sorteio quando todos confirmarem participação.
+            </p>
+            
+            <div class="form-group">
+                <label for="senhaAdmin">Senha de Administrador:</label>
+                <input type="password" id="senhaAdmin" placeholder="Digite a senha">
+            </div>
+
+            <div class="btn-group">
+                <button type="button" id="btnSortear" class="btn-secondary">🎲 Realizar Sorteio</button>
+                <button type="button" id="btnVerSorteio" class="btn-secondary">👀 Ver Resultado do Sorteio</button>
+                <button type="button" id="btnLimpar" class="btn-secondary">🗑️ Limpar Dados</button>
+            </div>
+
+            <div id="resultadoSorteio"></div>
+        </div>
+
+        <p class="footer">
+            💝 Este é um evento exclusivo para a nossa reunião de família.<br>
+            Desenvolvido com carinho para nossa celebração de Ano Novo 2025.
+        </p>
+    </div>
+
+    <!-- JavaScript -->
+    <script type="module" src="app.js"></script>
+</body>
+</html>
