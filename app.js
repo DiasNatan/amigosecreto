@@ -10,6 +10,12 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 // ==========================================
+// VARIÁVEL DE ESTADO
+// ==========================================
+let isAdminLogged = false;
+let participantesData = {}; // Armazena dados dos participantes para edição
+
+// ==========================================
 // FUNÇÕES AUXILIARES
 // ==========================================
 
@@ -156,28 +162,224 @@ document.getElementById('inscricaoForm').addEventListener('submit', async functi
 });
 
 // ==========================================
-// CARREGAR PARTICIPANTES (APENAS NOMES)
+// EXCLUIR PARTICIPANTE (ADMIN)
 // ==========================================
 
-onValue(ref(database, 'participantes'), (snapshot) => {
-    const data = snapshot.val();
-    const listaDiv = document.getElementById('listaParticipantes');
-    const totalSpan = document.getElementById('totalParticipantes');
+async function handleExcluirParticipante(participanteId, nomeParticipante, isFromList = true) {
+    if (!isAdminLogged) {
+        showAlert('Acesso negado! Faça login como organizador.', 'error');
+        return;
+    }
+
+    const confirmacao = confirm(`⚠️ Tem certeza que deseja EXCLUIR o participante ${nomeParticipante}?\n\nIsso é irreversível e irá bagunçar o sorteio se ele já tiver sido feito!`);
     
-    if (data) {
-        const participantes = Object.values(data);
-        totalSpan.textContent = participantes.length;
+    if (!confirmacao) {
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const participanteRef = ref(database, `participantes/${participanteId}`);
+        await remove(participanteRef);
         
+        // Se a exclusão vier do formulário de edição, volte para a lista
+        if (!isFromList) {
+            document.getElementById('formEdicaoContainer').classList.add('hidden');
+        }
+
+        showLoading(false);
+        showAlert(`✅ Participante ${nomeParticipante} removido com sucesso.`, 'success');
+        
+    } catch (error) {
+        showLoading(false);
+        showAlert('Erro ao remover participante: ' + error.message, 'error');
+        console.error(error);
+    }
+}
+
+
+// ==========================================
+// FUNÇÃO CENTRAL DE CARREGAMENTO DE PARTICIPANTES
+// ==========================================
+
+function loadParticipantes(data) {
+    // Armazena a lista bruta para fácil acesso (necessário para a edição)
+    participantesData = data || {}; 
+    
+    const listaDiv = document.getElementById('listaParticipantes');
+    const listaAdminDiv = document.getElementById('listaAdminParticipantes');
+    const totalSpan = document.getElementById('totalParticipantes');
+
+    if (data) {
+        // Conversão dos dados em Array (preserva a ID do Firebase)
+        const participantes = Object.entries(data).map(([id, dados]) => ({ id, ...dados }));
+        totalSpan.textContent = participantes.length;
+
+        // 1. Lista Pública (apenas nomes)
         listaDiv.innerHTML = participantes.map(p => `
             <div class="participante-item">
                 <strong>👤 ${p.nome}</strong>
             </div>
         `).join('');
+
+        // 2. Lista de Admin (detalhes + botão de edição/exclusão)
+        if (isAdminLogged) {
+            listaAdminDiv.innerHTML = participantes.map(p => `
+                <div class="participante-admin-item" data-id="${p.id}">
+                    <div class="info">
+                        <strong>${p.nome}</strong>
+                        <p>📱 ${p.whatsapp}</p>
+                        <p>💭 ${p.sugestoes}</p>
+                    </div>
+                    <div class="btn-group-admin" style="display: flex; gap: 10px;">
+                        <button class="btn btn-test btn-editar" data-id="${p.id}">✏️ Editar</button>
+                        <button class="btn-excluir" data-id="${p.id}">🗑️ Excluir</button>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Adicionar event listeners aos novos botões
+            document.querySelectorAll('.btn-excluir').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    // Chama a função de exclusão com o ID e nome
+                    const nome = e.target.closest('.participante-admin-item').querySelector('.info strong').textContent.trim();
+                    handleExcluirParticipante(e.target.dataset.id, nome, true);
+                });
+            });
+
+            document.querySelectorAll('.btn-editar').forEach(button => {
+                button.addEventListener('click', handleAbrirEdicao);
+            });
+
+        } else {
+            listaAdminDiv.innerHTML = '<p style="text-align: center; color: #999;">Faça o login de administrador para ver os detalhes e gerenciar participantes.</p>';
+        }
     } else {
         totalSpan.textContent = '0';
         listaDiv.innerHTML = '<p style="text-align: center; color: #999;">Nenhum participante inscrito ainda.</p>';
+        listaAdminDiv.innerHTML = '';
+    }
+}
+
+
+// Listener principal para o banco de dados
+onValue(ref(database, 'participantes'), (snapshot) => {
+    loadParticipantes(snapshot.val());
+});
+
+
+// ==========================================
+// GERENCIAR EDIÇÃO DE PARTICIPANTES (ADMIN)
+// ==========================================
+
+function handleAbrirEdicao(e) {
+    const id = e.target.dataset.id;
+    const dados = participantesData[id];
+
+    if (!dados) {
+        showAlert('Erro: Participante não encontrado!', 'error');
+        return;
+    }
+
+    // Pré-preenche o formulário
+    document.getElementById('edicaoId').value = id;
+    document.getElementById('edicaoNome').value = dados.nome;
+    document.getElementById('edicaoWhatsapp').value = dados.whatsapp;
+    document.getElementById('edicaoSugestoes').value = dados.sugestoes;
+    document.getElementById('nomeParticipanteEdicao').textContent = dados.nome; // Atualiza o título do card
+
+    // Esconde a lista e mostra o formulário
+    document.getElementById('listaAdminParticipantes').classList.add('hidden');
+    document.getElementById('formEdicaoContainer').classList.remove('hidden');
+
+    // Listener para o novo botão de Excluir dentro do formulário de edição
+    document.getElementById('btnExcluirEdicao').onclick = () => {
+        handleExcluirParticipante(id, dados.nome, false); // false = exclusão do formulário
+    };
+    
+    // Listener para o botão Cancelar
+    document.getElementById('btnCancelarEdicao').onclick = () => {
+        document.getElementById('formEdicaoContainer').classList.add('hidden');
+        document.getElementById('listaAdminParticipantes').classList.remove('hidden');
+    };
+}
+
+
+document.getElementById('edicaoForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+
+    const id = document.getElementById('edicaoId').value;
+    const nome = document.getElementById('edicaoNome').value.trim();
+    const whatsapp = document.getElementById('edicaoWhatsapp').value.trim();
+    const sugestoes = document.getElementById('edicaoSugestoes').value.trim();
+
+    if (!nome || !whatsapp || !sugestoes) {
+        showAlert('Por favor, preencha todos os campos!', 'error');
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const participanteRef = ref(database, `participantes/${id}`);
+        
+        // Usa SET para ATUALIZAR os dados no nó com o ID específico
+        await set(participanteRef, {
+            nome: nome,
+            whatsapp: whatsapp,
+            sugestoes: sugestoes,
+            dataInscricao: participantesData[id].dataInscricao // Mantém a data de inscrição original
+        });
+
+        showLoading(false);
+        showAlert(`✅ Participante ${nome} atualizado com sucesso!`, 'success');
+        
+        // Volta para a lista de participantes
+        document.getElementById('formEdicaoContainer').classList.add('hidden');
+        document.getElementById('listaAdminParticipantes').classList.remove('hidden');
+
+    } catch (error) {
+        showLoading(false);
+        showAlert('Erro ao salvar edição: ' + error.message, 'error');
+        console.error(error);
     }
 });
+
+
+// ==========================================
+// ACESSO AO PAINEL ADMIN (LOGIN/LOGOUT)
+// ==========================================
+
+document.getElementById('btnAcessoAdmin').addEventListener('click', function() {
+    const senha = document.getElementById('senhaAcessoAdmin').value;
+    
+    if (senha === SENHA_ADMIN) {
+        isAdminLogged = true;
+        document.getElementById('adminLoginCard').classList.add('hidden');
+        document.getElementById('adminPanelCard').classList.remove('hidden');
+        document.getElementById('senhaAcessoAdmin').value = ''; // Limpa a senha
+        showAlert('✅ Acesso de Organizador liberado! Agora você pode gerenciar.', 'success');
+        // Recarrega a lista para mostrar os botões de exclusão/edição
+        onValue(ref(database, 'participantes'), (snapshot) => {
+            loadParticipantes(snapshot.val());
+        }, { onlyOnce: true });
+    } else {
+        showAlert('Senha de acesso incorreta! Tente novamente.', 'error');
+    }
+});
+
+document.getElementById('btnSairAdmin').addEventListener('click', function() {
+    isAdminLogged = false;
+    document.getElementById('adminLoginCard').classList.remove('hidden');
+    document.getElementById('adminPanelCard').classList.add('hidden');
+    showAlert('🚪 Sessão de Organizador encerrada.', 'info');
+    // Recarrega a lista para esconder os botões de exclusão e detalhes
+    onValue(ref(database, 'participantes'), (snapshot) => {
+        loadParticipantes(snapshot.val());
+    }, { onlyOnce: true });
+});
+
 
 // ==========================================
 // ALGORITMO DE SORTEIO (COM CÓDIGOS)
@@ -262,10 +464,8 @@ function realizarSorteio(participantes) {
 // ==========================================
 
 document.getElementById('btnSortearTeste').addEventListener('click', async function() {
-    const senha = document.getElementById('senhaAdmin').value;
-    
-    if (senha !== SENHA_ADMIN) {
-        showAlert('Senha incorreta! Apenas o organizador pode realizar o sorteio.', 'error');
+    if (!isAdminLogged) {
+        showAlert('Acesso negado! Faça login como organizador.', 'error');
         return;
     }
 
@@ -284,7 +484,7 @@ document.getElementById('btnSortearTeste').addEventListener('click', async funct
             return;
         }
 
-        const { resultado, codigos } = realizarSorteio(participantes);
+        const { resultado } = realizarSorteio(participantes);
         
         // Buscar dados dos participantes para pegar os telefones
         const telefonesPorNome = {};
@@ -341,10 +541,8 @@ document.getElementById('btnSortearTeste').addEventListener('click', async funct
 // ==========================================
 
 document.getElementById('btnSortear').addEventListener('click', async function() {
-    const senha = document.getElementById('senhaAdmin').value;
-    
-    if (senha !== SENHA_ADMIN) {
-        showAlert('Senha incorreta! Apenas o organizador pode realizar o sorteio.', 'error');
+    if (!isAdminLogged) {
+        showAlert('Acesso negado! Faça login como organizador.', 'error');
         return;
     }
 
@@ -379,7 +577,7 @@ document.getElementById('btnSortear').addEventListener('click', async function()
         });
         
         showLoading(false);
-        showAlert('🎲 Sorteio OFICIAL realizado com sucesso! Os códigos foram salvos. Clique em "Ver Resultado" para visualizar e enviar.', 'success');
+        showAlert('🎲 Sorteio OFICIAL realizado com sucesso! Os códigos foram salvos. Clique em "Ver Resultados" para visualizar e enviar.', 'success');
         createConfetti();
         
     } catch (error) {
@@ -394,10 +592,8 @@ document.getElementById('btnSortear').addEventListener('click', async function()
 // ==========================================
 
 document.getElementById('btnVerSorteio').addEventListener('click', async function() {
-    const senha = document.getElementById('senhaAdmin').value;
-    
-    if (senha !== SENHA_ADMIN) {
-        showAlert('Senha incorreta! Apenas o organizador pode ver o resultado.', 'error');
+    if (!isAdminLogged) {
+        showAlert('Acesso negado! Faça login como organizador.', 'error');
         return;
     }
 
@@ -487,7 +683,7 @@ document.getElementById('btnVerSorteio').addEventListener('click', async functio
 });
 
 // ==========================================
-// CONSULTAR AMIGO SECRETO (PARTICIPANTE - SEM TELEFONE)
+// CONSULTAR AMIGO SECRETO (PARTICIPANTE)
 // ==========================================
 
 document.getElementById('btnConsultar').addEventListener('click', async function() {
@@ -558,15 +754,14 @@ document.getElementById('codigoConsulta').addEventListener('input', function(e) 
     e.target.value = e.target.value.toUpperCase();
 });
 
+
 // ==========================================
-// LIMPAR DADOS
+// LIMPAR DADOS (ADMIN)
 // ==========================================
 
 document.getElementById('btnLimpar').addEventListener('click', async function() {
-    const senha = document.getElementById('senhaAdmin').value;
-    
-    if (senha !== SENHA_ADMIN) {
-        showAlert('Senha incorreta! Apenas o organizador pode limpar os dados.', 'error');
+    if (!isAdminLogged) {
+        showAlert('Acesso negado! Faça login como organizador.', 'error');
         return;
     }
 
@@ -583,6 +778,7 @@ document.getElementById('btnLimpar').addEventListener('click', async function() 
         await remove(ref(database, 'sorteio'));
         
         document.getElementById('resultadoSorteio').innerHTML = '';
+        document.getElementById('listaAdminParticipantes').innerHTML = '';
         
         showLoading(false);
         showAlert('✅ Todos os dados foram removidos com sucesso!', 'success');
