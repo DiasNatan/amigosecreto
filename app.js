@@ -305,7 +305,7 @@ document.getElementById('btnSortear').addEventListener('click', async function()
 });
 
 // ==========================================
-// VER RESULTADO DO SORTEIO (ADMIN - COM CÓDIGOS)
+// VER RESULTADO DO SORTEIO (ADMIN - COM CÓDIGOS E WHATSAPP)
 // ==========================================
 
 document.getElementById('btnVerSorteio').addEventListener('click', async function() {
@@ -331,28 +331,68 @@ document.getElementById('btnVerSorteio').addEventListener('click', async functio
             return;
         }
 
+        // Buscar dados dos participantes para pegar os telefones
+        const participantesSnapshot = await new Promise((resolve) => {
+            onValue(ref(database, 'participantes'), resolve, { onlyOnce: true });
+        });
+        
+        const participantesData = participantesSnapshot.val();
+        
+        // Criar mapa de nome -> telefone
+        const telefonesPorNome = {};
+        if (participantesData) {
+            Object.values(participantesData).forEach(p => {
+                telefonesPorNome[p.nome] = p.whatsapp;
+            });
+        }
+
         const resultado = sorteioData.resultado;
         const resultadoDiv = document.getElementById('resultadoSorteio');
         
-        let html = '<h4 style="color: var(--cor-detalhe); margin-top: 20px;">📋 Resultado do Sorteio:</h4>';
-        html += '<p style="color: #666; margin-bottom: 15px;"><strong>⚠️ Atenção:</strong> Envie os códigos individualmente para cada participante via WhatsApp!</p>';
+        // Pegar URL atual do site
+        const urlSite = window.location.href.split('?')[0]; // Remove query params se houver
+        
+        let html = '<h4 style="color: var(--cor-detalhe); margin-top: 20px;">📋 Códigos para Enviar:</h4>';
+        html += '<p style="color: #666; margin-bottom: 15px;"><strong>⚠️ Importante:</strong> Clique no botão do WhatsApp para enviar o código para cada participante. <strong>Não compartilhe quem tirou quem!</strong></p>';
         
         for (const [pessoa, dados] of Object.entries(resultado)) {
+            const telefone = telefonesPorNome[pessoa];
+            const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+            
+            // Mensagem personalizada com nome da pessoa
+            const mensagem = `🎁 *Olá, ${pessoa}!*%0A%0ASeu código do Amigo Secreto é:%0A%0A*${dados.codigo}*%0A%0AUse este código no site para descobrir quem você tirou!%0A%0A🔗 Acesse: ${urlSite}%0A%0A🎉 Boa sorte e capriche no presente!`;
+            
+            const linkWhatsApp = telefone ? `https://wa.me/55${telefoneNumeros}?text=${mensagem}` : '#';
+            
             html += `
-                <div class="sorteio-resultado">
-                    <strong>👤 ${pessoa}</strong><br>
-                    <strong style="color: #4CAF50;">🔑 Código: ${dados.codigo}</strong><br>
-                    <hr style="margin: 10px 0; border: none; border-top: 1px dashed #ddd;">
-                    Tirou: <strong style="color: var(--cor-acento);">${dados.tirouNome}</strong><br>
-                    📱 WhatsApp: ${dados.dadosAmigo.whatsapp}<br>
-                    💭 Sugestões: ${dados.dadosAmigo.sugestoes}
+                <div class="sorteio-resultado" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <strong>👤 ${pessoa}</strong><br>
+                        <strong style="color: #4CAF50; font-size: 1.2em;">🔑 ${dados.codigo}</strong>
+                    </div>
+                    ${telefone ? `
+                        <a href="${linkWhatsApp}" target="_blank" rel="noopener noreferrer" 
+                           style="background: linear-gradient(135deg, #25D366, #128C7E); 
+                                  color: white; 
+                                  padding: 12px 25px; 
+                                  border-radius: 50px; 
+                                  text-decoration: none; 
+                                  font-weight: 700;
+                                  display: inline-flex;
+                                  align-items: center;
+                                  gap: 8px;
+                                  transition: all 0.3s ease;
+                                  box-shadow: 0 4px 12px rgba(37, 211, 102, 0.3);">
+                            <span style="font-size: 1.2em;">📱</span> Enviar no WhatsApp
+                        </a>
+                    ` : '<span style="color: #999;">Sem WhatsApp</span>'}
                 </div>
             `;
         }
         
         resultadoDiv.innerHTML = html;
         showLoading(false);
-        showAlert('Resultado carregado! Envie os códigos para cada participante.', 'success');
+        showAlert('Códigos carregados! Use os botões para enviar via WhatsApp.', 'success');
         
     } catch (error) {
         showLoading(false);
@@ -362,7 +402,7 @@ document.getElementById('btnVerSorteio').addEventListener('click', async functio
 });
 
 // ==========================================
-// CONSULTAR AMIGO SECRETO (PARTICIPANTE)
+// CONSULTAR AMIGO SECRETO (PARTICIPANTE - SEM TELEFONE)
 // ==========================================
 
 document.getElementById('btnConsultar').addEventListener('click', async function() {
@@ -401,7 +441,6 @@ document.getElementById('btnConsultar').addEventListener('click', async function
         
         // Garantir que estamos pegando o nome correto
         const nomeAmigoSecreto = dados.tirouNome || dados.dadosAmigo.nome;
-        const whatsappAmigo = dados.dadosAmigo.whatsapp;
         const sugestoesAmigo = dados.dadosAmigo.sugestoes;
         
         resultadoDiv.innerHTML = `
@@ -409,11 +448,10 @@ document.getElementById('btnConsultar').addEventListener('click', async function
                 <h4>🎉 Seu Amigo Secreto é:</h4>
                 <div class="amigo-nome">🎁 ${nomeAmigoSecreto}</div>
                 <div class="amigo-info">
-                    <p><strong>📱 WhatsApp:</strong> ${whatsappAmigo}</p>
                     <p><strong>💭 Sugestões de Presente:</strong></p>
-                    <p>${sugestoesAmigo}</p>
+                    <p style="font-size: 1.05em; line-height: 1.8;">${sugestoesAmigo}</p>
                 </div>
-                <p style="color: #666; margin-top: 15px; font-size: 0.9em;">
+                <p style="color: #666; margin-top: 15px; font-size: 0.9em; text-align: center;">
                     💝 Lembre-se: o presente deve custar entre R$ 20,00 e R$ 30,00. 
                     Capriche na criatividade!
                 </p>
