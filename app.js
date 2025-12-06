@@ -258,7 +258,86 @@ function realizarSorteio(participantes) {
 }
 
 // ==========================================
-// BOTÃO DE SORTEAR (COM CÓDIGOS)
+// BOTÃO DE SORTEAR TESTE (NÃO SALVA NO FIREBASE)
+// ==========================================
+
+document.getElementById('btnSortearTeste').addEventListener('click', async function() {
+    const senha = document.getElementById('senhaAdmin').value;
+    
+    if (senha !== SENHA_ADMIN) {
+        showAlert('Senha incorreta! Apenas o organizador pode realizar o sorteio.', 'error');
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const snapshot = await new Promise((resolve) => {
+            onValue(ref(database, 'participantes'), resolve, { onlyOnce: true });
+        });
+        
+        const participantes = snapshot.val();
+        
+        if (!participantes || Object.keys(participantes).length < 2) {
+            showLoading(false);
+            showAlert('É necessário pelo menos 2 participantes para realizar o sorteio!', 'error');
+            return;
+        }
+
+        const { resultado, codigos } = realizarSorteio(participantes);
+        
+        // Buscar dados dos participantes para pegar os telefones
+        const telefonesPorNome = {};
+        Object.values(participantes).forEach(p => {
+            telefonesPorNome[p.nome] = p.whatsapp;
+        });
+
+        const resultadoDiv = document.getElementById('resultadoSorteio');
+        const urlSite = window.location.href.split('?')[0];
+        
+        let html = '<div style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); padding: 20px; border-radius: 12px; border: 3px dashed #ff9800; margin-bottom: 20px;">';
+        html += '<h4 style="color: #ff6f00; margin-bottom: 10px;">🧪 SORTEIO DE TESTE (NÃO SALVO)</h4>';
+        html += '<p style="color: #e65100; font-weight: 600;">⚠️ Este é apenas um teste! Os códigos abaixo NÃO foram salvos e NÃO funcionarão na consulta.</p>';
+        html += '<p style="color: #e65100;">Use o botão "Sorteio Oficial" quando estiver pronto para realizar o sorteio definitivo.</p>';
+        html += '</div>';
+        
+        html += '<h4 style="color: var(--cor-detalhe); margin-top: 20px;">📋 Prévia dos Códigos:</h4>';
+        
+        for (const [pessoa, dados] of Object.entries(resultado)) {
+            const telefone = telefonesPorNome[pessoa];
+            const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+            
+            const mensagem = `🎁 *Olá, ${pessoa}!*%0A%0ASeu código do Amigo Secreto é:%0A%0A*${dados.codigo}*%0A%0AUse este código no site para descobrir quem você tirou!%0A%0A🔗 Acesse: ${urlSite}%0A%0A🎉 Boa sorte e capriche no presente!`;
+            const linkWhatsApp = telefone ? `https://wa.me/55${telefoneNumeros}?text=${mensagem}` : '#';
+            
+            html += `
+                <div class="sorteio-resultado" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; opacity: 0.7;">
+                    <div style="flex: 1; min-width: 200px;">
+                        <strong>👤 ${pessoa}</strong><br>
+                        <strong style="color: #ff9800; font-size: 1.2em;">🔑 ${dados.codigo}</strong>
+                    </div>
+                    ${telefone ? `
+                        <button disabled style="background: #ccc; color: #666; padding: 12px 25px; border-radius: 50px; border: none; cursor: not-allowed;">
+                            📱 Teste (Desabilitado)
+                        </button>
+                    ` : '<span style="color: #999;">Sem WhatsApp</span>'}
+                </div>
+            `;
+        }
+        
+        resultadoDiv.innerHTML = html;
+        showLoading(false);
+        showAlert('🧪 Sorteio de TESTE gerado! Este sorteio NÃO foi salvo. Use "Sorteio Oficial" quando estiver pronto.', 'info');
+        
+    } catch (error) {
+        showLoading(false);
+        showAlert('Erro ao realizar sorteio de teste: ' + error.message, 'error');
+        console.error(error);
+    }
+});
+
+// ==========================================
+// BOTÃO DE SORTEAR OFICIAL (SALVA NO FIREBASE)
 // ==========================================
 
 document.getElementById('btnSortear').addEventListener('click', async function() {
@@ -266,6 +345,12 @@ document.getElementById('btnSortear').addEventListener('click', async function()
     
     if (senha !== SENHA_ADMIN) {
         showAlert('Senha incorreta! Apenas o organizador pode realizar o sorteio.', 'error');
+        return;
+    }
+
+    const confirmacao = confirm('⚠️ ATENÇÃO! Você está prestes a realizar o SORTEIO OFICIAL.\n\nEste sorteio será salvo e os códigos gerados serão os definitivos.\n\nTem certeza que todos os participantes já se inscreveram?');
+    
+    if (!confirmacao) {
         return;
     }
 
@@ -294,7 +379,7 @@ document.getElementById('btnSortear').addEventListener('click', async function()
         });
         
         showLoading(false);
-        showAlert('🎲 Sorteio realizado com sucesso! Os códigos foram gerados. Clique em "Ver Resultado" para visualizar.', 'success');
+        showAlert('🎲 Sorteio OFICIAL realizado com sucesso! Os códigos foram salvos. Clique em "Ver Resultado" para visualizar e enviar.', 'success');
         createConfetti();
         
     } catch (error) {
