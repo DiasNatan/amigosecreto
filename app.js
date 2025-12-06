@@ -399,14 +399,19 @@ document.getElementById('btnConsultar').addEventListener('click', async function
         const dados = codigos[codigo];
         const resultadoDiv = document.getElementById('resultadoConsulta');
         
+        // Garantir que estamos pegando o nome correto
+        const nomeAmigoSecreto = dados.tirouNome || dados.dadosAmigo.nome;
+        const whatsappAmigo = dados.dadosAmigo.whatsapp;
+        const sugestoesAmigo = dados.dadosAmigo.sugestoes;
+        
         resultadoDiv.innerHTML = `
             <div class="resultado-amigo">
                 <h4>🎉 Seu Amigo Secreto é:</h4>
-                <div class="amigo-nome">🎁 ${dados.tirouNome}</div>
+                <div class="amigo-nome">🎁 ${nomeAmigoSecreto}</div>
                 <div class="amigo-info">
-                    <p><strong>📱 WhatsApp:</strong> ${dados.dadosAmigo.whatsapp}</p>
+                    <p><strong>📱 WhatsApp:</strong> ${whatsappAmigo}</p>
                     <p><strong>💭 Sugestões de Presente:</strong></p>
-                    <p>${dados.dadosAmigo.sugestoes}</p>
+                    <p>${sugestoesAmigo}</p>
                 </div>
                 <p style="color: #666; margin-top: 15px; font-size: 0.9em;">
                     💝 Lembre-se: o presente deve custar entre R$ 20,00 e R$ 30,00. 
@@ -421,7 +426,7 @@ document.getElementById('btnConsultar').addEventListener('click', async function
     } catch (error) {
         showLoading(false);
         showAlert('Erro ao consultar: ' + error.message, 'error');
-        console.error(error);
+        console.error('Erro completo:', error);
     }
 });
 
