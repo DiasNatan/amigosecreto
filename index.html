@@ -61,7 +61,7 @@
                     <div class="info-icon">🗓️</div>
                     <div class="info-content">
                         <strong>Data:</strong>
-                        <p>31 de Dezembro de 2025, durante nosso Jantar em Família na Virada do Ano.</p>
+                        <p>31 de Dezembro de 2025, durante nosso Jantar em Família na Virada do Ano.<br> Lembrando que será na casa de Neide.</p>
                     </div>
                 </div>
                 <div class="info-item">
@@ -118,7 +118,7 @@
             </div>
         </section>
 
-        <!-- Card: Participantes Confirmados -->
+        <!-- Card: Participantes Confirmados (Lista Pública) -->
         <section class="card card-participants">
             <div class="card-header">
                 <h2>👥 Participantes Confirmados</h2>
@@ -147,34 +147,85 @@
             </div>
         </section>
 
-        <!-- Card: Painel Administrativo -->
-        <section class="card card-admin">
+        <!-- Card: ACESSO AO PAINEL (simulação de login) -->
+        <section class="card card-admin-login" id="adminLoginCard">
             <div class="card-header">
-                <h2>🔐 Painel do Organizador</h2>
-                <p>Área exclusiva para gerenciar o evento</p>
+                <h2>🔑 Acesso ao Painel do Organizador</h2>
+                <p>Insira a senha mestra para gerenciar o sorteio e os participantes.</p>
             </div>
             <div class="card-body">
-                <div class="admin-warning">
-                    <strong>⚠️ Atenção Organizador!</strong>
-                    <p>Esta área é protegida por senha. Use-a para realizar o sorteio e visualizar os resultados.</p>
-                </div>
-                
                 <div class="form-group">
-                    <label for="senhaAdmin">🔑 Senha de Administrador:</label>
-                    <input type="password" id="senhaAdmin" placeholder="Digite a senha do organizador">
+                    <label for="senhaAcessoAdmin">Senha de Acesso:</label>
+                    <input type="password" id="senhaAcessoAdmin" placeholder="Senha do Organizador">
                 </div>
-
-                <div class="btn-group">
-                    <button type="button" id="btnSortearTeste" class="btn btn-test">🧪 Sorteio de Teste</button>
-                    <button type="button" id="btnSortear" class="btn btn-admin">🎲 Sorteio Oficial</button>
-                    <button type="button" id="btnVerSorteio" class="btn btn-admin">👀 Ver Resultado</button>
-                    <button type="button" id="btnLimpar" class="btn btn-danger">🗑️ Limpar Dados</button>
-                </div>
-
-                <div id="resultadoSorteio"></div>
+                <button type="button" id="btnAcessoAdmin" class="btn btn-admin">🔐 Entrar no Painel</button>
             </div>
         </section>
 
+
+        <!-- Card: Painel Administrativo (Inicialmente Oculto) -->
+        <section class="card card-admin hidden" id="adminPanelCard">
+            <div class="card-header">
+                <h2>🛠️ Gerenciamento do Sorteio</h2>
+                <button type="button" id="btnSairAdmin" class="btn-logout">Sair do Painel</button>
+            </div>
+            <div class="card-body">
+                <div class="admin-warning">
+                    <strong>⚠️ ATENÇÃO!</strong>
+                    <p>Esta área contém as ferramentas para realizar o sorteio, visualizar resultados e limpar todos os dados.</p>
+                </div>
+                
+                <div class="btn-group">
+                    <button type="button" id="btnSortearTeste" class="btn btn-test">🧪 Sorteio de Teste</button>
+                    <button type="button" id="btnSortear" class="btn btn-primary">🎲 Sorteio OFICIAL</button>
+                    <button type="button" id="btnVerSorteio" class="btn btn-admin">👀 Ver Resultados/Códigos</button>
+                    <button type="button" id="btnLimpar" class="btn btn-danger">🗑️ Limpar Todos os Dados</button>
+                </div>
+
+                <div id="resultadoSorteio"></div>
+
+                <h3 style="color: var(--cor-primaria); margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">👤 Gerenciar Participantes</h3>
+                <p style="color: var(--cor-texto-claro); margin-bottom: 15px;">Abaixo estão todos os dados, incluindo WhatsApp, e a opção para editar/excluir participantes.</p>
+                
+                <!-- NOVO FORMULÁRIO DE EDIÇÃO (Inicialmente Oculto) -->
+                <div id="formEdicaoContainer" class="hidden card card-form" style="margin-bottom: 25px;">
+                    <div class="card-header">
+                        <h2>✏️ Editar Participante: <span id="nomeParticipanteEdicao"></span></h2>
+                    </div>
+                    <div class="card-body">
+                        <form id="edicaoForm">
+                            <input type="hidden" id="edicaoId">
+                            <div class="form-group">
+                                <label for="edicaoNome">👤 Nome Completo:</label>
+                                <input type="text" id="edicaoNome" name="edicaoNome" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="edicaoWhatsapp">📱 Telefone WhatsApp:</label>
+                                <input type="tel" id="edicaoWhatsapp" name="edicaoWhatsapp" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="edicaoSugestoes">💭 Sugestões de Presente:</label>
+                                <textarea id="edicaoSugestoes" name="edicaoSugestoes" rows="4" required></textarea>
+                            </div>
+
+                            <div class="btn-group" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
+                                <button type="submit" class="btn btn-success">💾 Salvar Edição</button>
+                                <button type="button" id="btnCancelarEdicao" class="btn btn-admin">↩️ Cancelar</button>
+                                <button type="button" id="btnExcluirEdicao" class="btn btn-danger">🗑️ Excluir Participante</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- LISTA DE PARTICIPANTES (Inicialmente Visível/Ocultada pela Edição) -->
+                <div id="listaAdminParticipantes">
+                    <!-- Lista detalhada com botão de edição/exclusão será carregada aqui -->
+                </div>
+
+            </div>
+        </section>
     </div>
 
     <!-- Footer -->
