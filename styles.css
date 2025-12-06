@@ -1,6 +1,6 @@
 :root {
-    --cor-primaria: #800020;
-    --cor-secundaria: #DAA520;
+    --cor-primaria: #800020; /* Bordô Profundo */
+    --cor-secundaria: #DAA520; /* Dourado Suave */
     --cor-sucesso: #4CAF50;
     --cor-perigo: #dc3545;
     --cor-texto: #333333;
@@ -115,6 +115,7 @@ body {
 .card:nth-child(4) { animation-delay: 0.4s; }
 .card:nth-child(5) { animation-delay: 0.5s; }
 .card:nth-child(6) { animation-delay: 0.6s; }
+.card:nth-child(7) { animation-delay: 0.7s; }
 
 @keyframes fadeInUp {
     from {
@@ -282,7 +283,7 @@ textarea {
     min-height: 120px;
 }
 
-#codigoConsulta {
+#codigoConsulta, #senhaAcessoAdmin {
     text-transform: uppercase;
     font-size: 1.3em;
     font-weight: 700;
@@ -335,9 +336,14 @@ textarea {
     color: white;
 }
 
+.btn-test {
+    background: linear-gradient(135deg, #ffc107, #ffa000);
+    color: var(--cor-primaria);
+}
+
 .btn-group {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
     gap: 15px;
     margin-top: 20px;
 }
@@ -353,7 +359,7 @@ textarea {
     box-shadow: var(--shadow-sm);
 }
 
-/* PARTICIPANTES */
+/* PARTICIPANTES (PÚBLICO) */
 .participante-item {
     background: linear-gradient(135deg, #f8f9fa, #e9ecef);
     padding: 20px;
@@ -384,6 +390,74 @@ textarea {
 
 .participante-item strong {
     color: var(--cor-primaria);
+}
+
+/* PARTICIPANTES (ADMIN) */
+.participante-admin-item {
+    background: #f8f9fa;
+    padding: 15px;
+    margin-bottom: 10px;
+    border-radius: 8px;
+    border-left: 5px solid var(--cor-primaria);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    font-size: 0.95em;
+    transition: var(--transition);
+}
+
+.participante-admin-item:hover {
+    background: #e9ecef;
+}
+
+.participante-admin-item .info {
+    flex: 1;
+    min-width: 200px;
+}
+
+.participante-admin-item strong {
+    display: block;
+    font-size: 1.1em;
+    color: var(--cor-secundaria);
+}
+
+.btn-group-admin {
+    display: flex;
+    gap: 10px;
+}
+
+/* Botão de Excluir e Sair */
+.btn-excluir, .btn-logout {
+    background-color: var(--cor-perigo);
+    color: white;
+    padding: 10px 15px;
+    border-radius: 8px;
+    font-size: 0.9em;
+    font-weight: 700;
+    cursor: pointer;
+    transition: var(--transition);
+    border: none;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.btn-excluir:hover, .btn-logout:hover {
+    background-color: #c82333;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.15);
+}
+
+.btn-logout {
+    background-color: #6c757d;
+    font-size: 0.9em;
+    margin-left: 15px;
+    padding: 8px 15px;
+    border-radius: 50px;
+}
+
+.btn-logout:hover {
+    background-color: #5a6268;
 }
 
 /* RESULTADO CONSULTA */
@@ -559,6 +633,11 @@ textarea {
     }
 }
 
+/* Utilitário para esconder elementos */
+.hidden {
+    display: none !important;
+}
+
 /* RESPONSIVO */
 @media (max-width: 768px) {
     .header h1 {
@@ -607,6 +686,11 @@ textarea {
 
     .btn-group {
         grid-template-columns: 1fr;
+    }
+
+    .participante-admin-item {
+        flex-direction: column;
+        align-items: flex-start;
     }
 
     .amigo-nome {
