@@ -389,7 +389,7 @@ document.getElementById('btnSairAdmin').addEventListener('click', function() {
 
 
 // ==========================================
-// ALGORITMO DE SORTEIO (COM CÓDIGOS)
+// ALGORITMO DE SORTEIO (COM CÓDIGOS) - REFORÇADO
 // ==========================================
 
 function realizarSorteio(participantes) {
@@ -406,64 +406,87 @@ function realizarSorteio(participantes) {
     }
 
     let tentativas = 0;
-    const maxTentativas = 100;
+    const maxTentativas = 500; // Aumentei o limite de tentativas
     
     while (tentativas < maxTentativas) {
-        // Criar cópia embaralhada dos índices
-        let indices = [...Array(n).keys()];
+        let sorteados = [...participantesArray]; // Array de quem vai ser tirado
         
-        // Embaralhamento Fisher-Yates
-        for (let i = indices.length - 1; i > 0; i--) {
+        // 1. Embaralhamento Fisher-Yates: Cria uma lista de quem vai ser tirado.
+        for (let i = sorteados.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [indices[i], indices[j]] = [indices[j], indices[i]];
+            [sorteados[i], sorteados[j]] = [sorteados[j], sorteados[i]];
         }
         
-        // Verificar se ninguém tirou a si mesmo
+        // 2. Mapeamento dos Resultados e Checagem Imediata (Ninguém tira a si mesmo)
+        let resultado = {};
         let valido = true;
+        
         for (let i = 0; i < n; i++) {
-            if (i === indices[i]) {
+            const sorteador = participantesArray[i];
+            const tirado = sorteados[i];
+            
+            // Checagem 1: Ninguém tira a si mesmo
+            if (sorteador.id === tirado.id) {
                 valido = false;
                 break;
             }
+            
+            resultado[sorteador.nome] = {
+                tirouNome: tirado.nome,
+                dadosAmigo: {
+                    nome: tirado.nome,
+                    whatsapp: tirado.whatsapp,
+                    sugestoes: tirado.sugestoes
+                },
+                // Código será gerado se for válido
+            };
         }
         
-        if (valido) {
-            const resultado = {};
+        // Se a checagem 1 falhou, tente novamente
+        if (!valido) {
+            tentativas++;
+            continue;
+        }
+        
+        // 3. Checagem do Círculo Único
+        const participantesNomes = participantesArray.map(p => p.nome);
+        const visitados = new Set();
+        let atual = participantesNomes[0];
+        
+        // Percorrer a cadeia de sorteios
+        for (let i = 0; i < n; i++) {
+            if (visitados.has(atual)) break; // Loop detectado
+            visitados.add(atual);
+            atual = resultado[atual].tirouNome;
+        }
+        
+        // Checagem 3: O ciclo é único se o número de visitados for igual ao número de participantes.
+        if (visitados.size === n) {
+            // Sorteio VÁLIDO: Círculo único e sem auto-sorteio.
+            
             const codigos = {};
             
-            for (let i = 0; i < n; i++) {
-                const participante = participantesArray[i];
-                const amigoSecreto = participantesArray[indices[i]];
+            // Gerar códigos e finalizar a estrutura de resultados
+            for (const nomeSorteador of participantesNomes) {
                 const codigo = gerarCodigo();
-                
-                resultado[participante.nome] = {
-                    tirouNome: amigoSecreto.nome,
-                    dadosAmigo: {
-                        nome: amigoSecreto.nome,
-                        whatsapp: amigoSecreto.whatsapp,
-                        sugestoes: amigoSecreto.sugestoes
-                    },
-                    codigo: codigo
-                };
+                resultado[nomeSorteador].codigo = codigo;
                 
                 // Criar índice por código para consulta rápida
                 codigos[codigo] = {
-                    participante: participante.nome,
-                    tirouNome: amigoSecreto.nome,
-                    dadosAmigo: {
-                        nome: amigoSecreto.nome,
-                        whatsapp: amigoSecreto.whatsapp,
-                        sugestoes: amigoSecreto.sugestoes
-                    }
+                    participante: nomeSorteador,
+                    tirouNome: resultado[nomeSorteador].tirouNome,
+                    dadosAmigo: resultado[nomeSorteador].dadosAmigo
                 };
             }
+            
             return { resultado, codigos };
         }
         
         tentativas++;
     }
     
-    throw new Error('Não foi possível realizar um sorteio válido. Tente novamente!');
+    // Se esgotou as tentativas (500), joga erro
+    throw new Error('Não foi possível realizar um sorteio válido após 500 tentativas. Tente novamente!');
 }
 
 // ==========================================
@@ -994,3 +1017,4 @@ document.getElementById('btnLimpar').addEventListener('click', async function() 
         console.error(error);
     }
 });
+
