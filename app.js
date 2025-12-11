@@ -1,3 +1,5 @@
+--- START OF FILE app.js ---
+
 // ==========================================
 // IMPORTAÇÕES
 // ==========================================
@@ -387,7 +389,7 @@ if (edicaoForm) {
 
 
 // ==========================================
-// ACESSO AO PAINEL ADMIN (LOGIN/LOGOUT) - CORRIGIDO
+// ACESSO AO PAINEL ADMIN (LOGIN/LOGOUT) - FINALMENTE CORRIGIDO
 // ==========================================
 
 const btnAcessoAdmin = document.getElementById('btnAcessoAdmin');
@@ -1108,4 +1110,3 @@ if (btnLimpar) {
     // Login deve estar visível
     if (adminLogin) adminLogin.classList.remove('hidden');
 })();
-
