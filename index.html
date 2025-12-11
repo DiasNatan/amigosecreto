@@ -61,7 +61,7 @@
                     <div class="info-icon">🗓️</div>
                     <div class="info-content">
                         <strong>Data:</strong>
-                        <p>31 de Dezembro de 2025, durante nosso Jantar em Família na Virada do Ano.<br> Lembrando que será na casa de Neide.</p>
+                        <p>31 de Dezembro de 2025, durante nosso Jantar em Família na Virada do Ano.</p>
                     </div>
                 </div>
                 <div class="info-item">
@@ -178,6 +178,8 @@
                 <div class="btn-group">
                     <button type="button" id="btnSortearTeste" class="btn btn-test">🧪 Sorteio de Teste</button>
                     <button type="button" id="btnSortear" class="btn btn-primary">🎲 Sorteio OFICIAL</button>
+                    <!-- NOVO BOTÃO -->
+                    <button type="button" id="btnVerificarSorteio" class="btn btn-success">✅ Verificar Sorteio</button>
                     <button type="button" id="btnVerSorteio" class="btn btn-admin">👀 Ver Resultados/Códigos</button>
                     <button type="button" id="btnLimpar" class="btn btn-danger">🗑️ Limpar Todos os Dados</button>
                 </div>
@@ -187,7 +189,7 @@
                 <h3 style="color: var(--cor-primaria); margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">👤 Gerenciar Participantes</h3>
                 <p style="color: var(--cor-texto-claro); margin-bottom: 15px;">Abaixo estão todos os dados, incluindo WhatsApp, e a opção para editar/excluir participantes.</p>
                 
-                <!-- NOVO FORMULÁRIO DE EDIÇÃO (Inicialmente Oculto) -->
+                <!-- FORMULÁRIO DE EDIÇÃO (Inicialmente Oculto) -->
                 <div id="formEdicaoContainer" class="hidden card card-form" style="margin-bottom: 25px;">
                     <div class="card-header">
                         <h2>✏️ Editar Participante: <span id="nomeParticipanteEdicao"></span></h2>
@@ -219,7 +221,7 @@
                     </div>
                 </div>
 
-                <!-- LISTA DE PARTICIPANTES (Inicialmente Visível/Ocultada pela Edição) -->
+                <!-- LISTA DE PARTICIPANTES -->
                 <div id="listaAdminParticipantes">
                     <!-- Lista detalhada com botão de edição/exclusão será carregada aqui -->
                 </div>
