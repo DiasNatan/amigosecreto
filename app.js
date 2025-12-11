@@ -395,7 +395,7 @@ if (edicaoForm) {
 const btnAcessoAdmin = document.getElementById('btnAcessoAdmin');
 if (btnAcessoAdmin) {
     btnAcessoAdmin.addEventListener('click', function() {
-        const senhaEl = document.getElementById('senhaAdmin');
+        const senhaEl = document.getElementById('senha_Admin');
         const senha = senhaEl ? senhaEl.value : '';
         
         if (senha === SENHA_ADMIN) {
@@ -1111,3 +1111,4 @@ if (btnLimpar) {
     // Login deve estar visível
     if (adminLogin) adminLogin.classList.remove('hidden');
 })();
+
