@@ -147,32 +147,22 @@
             </div>
         </section>
 
-        <!-- Card: ACESSO AO PAINEL (simulação de login) -->
-        <section class="card card-admin-login" id="adminLoginCard">
+        <!-- Card: Painel Administrativo (Versão Simples) -->
+        <section class="card card-admin" id="adminPanelCard">
             <div class="card-header">
-                <h2>🔑 Acesso ao Painel do Organizador</h2>
-                <p>Insira a senha mestra para gerenciar o sorteio e os participantes.</p>
-            </div>
-            <div class="card-body">
-                <div class="form-group">
-                    <label for="senhaAcessoAdmin">Senha de Acesso:</label>
-                    <input type="password" id="senhaAcessoAdmin" placeholder="Senha do Organizador">
-                </div>
-                <button type="button" id="btnAcessoAdmin" class="btn btn-admin">🔐 Entrar no Painel</button>
-            </div>
-        </section>
-
-
-        <!-- Card: Painel Administrativo (Inicialmente Oculto) -->
-        <section class="card card-admin hidden" id="adminPanelCard">
-            <div class="card-header">
-                <h2>🛠️ Gerenciamento do Sorteio</h2>
-                <button type="button" id="btnSairAdmin" class="btn-logout">Sair do Painel</button>
+                <h2>🔐 Painel do Organizador</h2>
+                <p>Área protegida por senha para gerenciar o evento</p>
             </div>
             <div class="card-body">
                 <div class="admin-warning">
-                    <strong>⚠️ ATENÇÃO!</strong>
-                    <p>Esta área contém as ferramentas para realizar o sorteio, visualizar resultados e limpar todos os dados.</p>
+                    <strong>⚠️ Atenção Organizador!</strong>
+                    <p>Digite a senha abaixo antes de usar os botões de gerenciamento.</p>
+                </div>
+                
+                <div class="form-group">
+                    <label for="senhaAdmin">🔑 Senha de Administrador:</label>
+                    <!-- ID CORRIGIDO PARA O QUE O JS ESPERA -->
+                    <input type="password" id="senhaAdmin" placeholder="Digite a senha do organizador">
                 </div>
                 
                 <div class="btn-group">
@@ -180,52 +170,13 @@
                     <button type="button" id="btnSortear" class="btn btn-primary">🎲 Sorteio OFICIAL</button>
                     <button type="button" id="btnVerificarSorteio" class="btn btn-success">✅ Verificar Sorteio</button>
                     <button type="button" id="btnVerSorteio" class="btn btn-admin">👀 Ver Resultados/Códigos</button>
-                    <!-- NOVO BOTÃO -->
                     <button type="button" id="btnApagarSorteio" class="btn btn-test">❌ Apagar Último Sorteio</button> 
                     <button type="button" id="btnLimpar" class="btn btn-danger">🗑️ Limpar Todos os Dados</button>
                 </div>
 
                 <div id="resultadoSorteio"></div>
-
-                <h3 style="color: var(--cor-primaria); margin-top: 30px; border-top: 1px solid #eee; padding-top: 20px;">👤 Gerenciar Participantes</h3>
-                <p style="color: var(--cor-texto-claro); margin-bottom: 15px;">Abaixo estão todos os dados, incluindo WhatsApp, e a opção para editar/excluir participantes.</p>
                 
-                <!-- FORMULÁRIO DE EDIÇÃO (Inicialmente Oculto) -->
-                <div id="formEdicaoContainer" class="hidden card card-form" style="margin-bottom: 25px;">
-                    <div class="card-header">
-                        <h2>✏️ Editar Participante: <span id="nomeParticipanteEdicao"></span></h2>
-                    </div>
-                    <div class="card-body">
-                        <form id="edicaoForm">
-                            <input type="hidden" id="edicaoId">
-                            <div class="form-group">
-                                <label for="edicaoNome">👤 Nome Completo:</label>
-                                <input type="text" id="edicaoNome" name="edicaoNome" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="edicaoWhatsapp">📱 Telefone WhatsApp:</label>
-                                <input type="tel" id="edicaoWhatsapp" name="edicaoWhatsapp" required>
-                            </div>
-
-                            <div class="form-group">
-                                <label for="edicaoSugestoes">💭 Sugestões de Presente:</label>
-                                <textarea id="edicaoSugestoes" name="edicaoSugestoes" rows="4" required></textarea>
-                            </div>
-
-                            <div class="btn-group" style="grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));">
-                                <button type="submit" class="btn btn-success">💾 Salvar Edição</button>
-                                <button type="button" id="btnCancelarEdicao" class="btn btn-admin">↩️ Cancelar</button>
-                                <button type="button" id="btnExcluirEdicao" class="btn btn-danger">🗑️ Excluir Participante</button>
-                            </div>
-                        </form>
-                    </div>
-                </div>
-
-                <!-- LISTA DE PARTICIPANTES -->
-                <div id="listaAdminParticipantes">
-                    <!-- Lista detalhada com botão de edição/exclusão será carregada aqui -->
-                </div>
+                <!-- A lista detalhada de participantes e o formulário de edição NÃO EXISTEM nesta versão simplificada -->
 
             </div>
         </section>
