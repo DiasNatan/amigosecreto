@@ -952,3 +952,4 @@ document.getElementById('btnLimpar').addEventListener('click', async function() 
         console.error(error);
     }
 });
+
