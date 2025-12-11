@@ -75,6 +75,13 @@ function gerarCodigo() {
     return codigo;
 }
 
+// Função auxiliar para normalizar o nome (remover emojis e espaços que podem dar erro na checagem)
+function normalizeName(name) {
+    // Remove emojis/caracteres especiais e converte para minúsculas
+    return name.trim().replace(/[^\w\s]/gi, '').toLowerCase();
+}
+
+
 // ==========================================
 // CONTAGEM REGRESSIVA
 // ==========================================
@@ -620,7 +627,8 @@ document.getElementById('btnVerificarSorteio').addEventListener('click', async f
         let pessoasComProblema = [];
         
         for (const pessoa of participantes) {
-            if (pessoa === resultado[pessoa].tirouNome) {
+            // CORREÇÃO: Usando normalizeName para comparar nomes de forma robusta (ignora emojis/espaços)
+            if (normalizeName(pessoa) === normalizeName(resultado[pessoa].tirouNome)) {
                 erroAutoSorteio = true;
                 pessoasComProblema.push(pessoa);
             }
@@ -646,7 +654,7 @@ document.getElementById('btnVerificarSorteio').addEventListener('click', async f
             }
         }
         
-        // VERIFICAÇÃO 3: Todos os participantes têm um amigo secreto (sempre true se não houver erro no sorteio)
+        // VERIFICAÇÃO 3: Todos os participantes têm um amigo secreto
         let todosTiramAlguem = participantes.every(p => resultado[p].tirouNome);
         
         // VERIFICAÇÃO 4: Todos são tirados por alguém
@@ -919,7 +927,41 @@ document.getElementById('codigoConsulta').addEventListener('input', function(e) 
 
 
 // ==========================================
-// LIMPAR DADOS (ADMIN)
+// APAGAR ÚLTIMO SORTEIO (ADMIN)
+// ==========================================
+
+document.getElementById('btnApagarSorteio').addEventListener('click', async function() {
+    if (!isAdminLogged) {
+        showAlert('Acesso negado! Faça login como organizador.', 'error');
+        return;
+    }
+
+    const confirmacao = confirm('⚠️ ATENÇÃO! Isso vai apagar APENAS o resultado do sorteio, permitindo que você sorteie novamente.\n\nOs participantes CADASTRADOS NÃO serão apagados. Tem certeza?');
+    
+    if (!confirmacao) {
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        await remove(ref(database, 'sorteio'));
+        
+        document.getElementById('resultadoSorteio').innerHTML = '';
+        
+        showLoading(false);
+        showAlert('✅ Último sorteio apagado com sucesso! Você já pode realizar um novo sorteio.', 'success');
+        
+    } catch (error) {
+        showLoading(false);
+        showAlert('Erro ao apagar sorteio: ' + error.message, 'error');
+        console.error(error);
+    }
+});
+
+
+// ==========================================
+// LIMPAR TODOS OS DADOS (ADMIN)
 // ==========================================
 
 document.getElementById('btnLimpar').addEventListener('click', async function() {
@@ -952,4 +994,3 @@ document.getElementById('btnLimpar').addEventListener('click', async function() 
         console.error(error);
     }
 });
-
