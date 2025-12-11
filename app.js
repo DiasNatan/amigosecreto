@@ -10,12 +10,6 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 // ==========================================
-// VARIÁVEL DE ESTADO
-// ==========================================
-let isAdminLogged = false;
-let participantesData = {}; // Armazena dados dos participantes para edição
-
-// ==========================================
 // FUNÇÕES AUXILIARES
 // ==========================================
 
@@ -49,7 +43,6 @@ function createConfetti() {
             confetti.className = 'confetti';
             confetti.style.left = Math.random() * 100 + '%';
             confetti.style.background = ['#DAA520', '#800020', '#FFD700'][Math.floor(Math.random() * 3)];
-            confetti.style.animationDelay = Math.random() * 3 + 's';
             document.body.appendChild(confetti);
             
             setTimeout(() => confetti.remove(), 3000);
@@ -77,7 +70,7 @@ function gerarCodigo() {
     return codigo;
 }
 
-// Função auxiliar para normalizar o nome (remove emojis e espaços para checagem)
+// Função auxiliar para normalizar o nome (para checagem de integridade)
 function normalizeName(name) {
     return name.trim().replace(/[^\w\s]/gi, '').toLowerCase();
 }
@@ -177,62 +170,18 @@ if (inscricaoForm) {
 }
 
 // ==========================================
-// EXCLUIR PARTICIPANTE (ADMIN)
+// CARREGAR PARTICIPANTES (APENAS NOMES)
 // ==========================================
-
-async function handleExcluirParticipante(participanteId, nomeParticipante, isFromList = true) {
-    if (!isAdminLogged) {
-        showAlert('Acesso negado! Faça login como organizador.', 'error');
-        return;
-    }
-
-    const confirmacao = confirm(`⚠️ Tem certeza que deseja EXCLUIR o participante ${nomeParticipante}?\n\nIsso é irreversível e irá bagunçar o sorteio se ele já tiver sido feito!`);
-    
-    if (!confirmacao) {
-        return;
-    }
-
-    showLoading(true);
-
-    try {
-        const participanteRef = ref(database, `participantes/${participanteId}`);
-        await remove(participanteRef);
-        
-        // Se a exclusão vier do formulário de edição, volte para a lista
-        if (!isFromList) {
-            const formEdicaoContainer = document.getElementById('formEdicaoContainer');
-            if(formEdicaoContainer) formEdicaoContainer.classList.add('hidden');
-        }
-
-        showLoading(false);
-        showAlert(`✅ Participante ${nomeParticipante} removido com sucesso.`, 'success');
-        
-    } catch (error) {
-        showLoading(false);
-        showAlert('Erro ao remover participante: ' + (error.message || error), 'error');
-        console.error(error);
-    }
-}
-
-
-// ==========================================
-// FUNÇÃO CENTRAL DE CARREGAMENTO DE PARTICIPANTES
-// ==========================================
-
-function loadParticipantes(data) {
-    // Armazena a lista bruta para fácil acesso (necessário para a edição)
-    participantesData = data || {}; 
-    
+// Simplificado para apenas carregar a lista pública
+onValue(ref(database, 'participantes'), (snapshot) => {
+    const data = snapshot.val();
     const listaDiv = document.getElementById('listaParticipantes');
-    const listaAdminDiv = document.getElementById('listaAdminParticipantes');
     const totalSpan = document.getElementById('totalParticipantes');
-
+    
     if (data) {
-        // Conversão dos dados em Array (preserva a ID do Firebase)
-        const participantes = Object.entries(data).map(([id, dados]) => ({ id, ...dados }));
+        const participantes = Object.values(data);
         if (totalSpan) totalSpan.textContent = participantes.length;
-
-        // 1. Lista Pública (apenas nomes)
+        
         if (listaDiv) {
             listaDiv.innerHTML = participantes.map(p => `
                 <div class="participante-item">
@@ -240,212 +189,18 @@ function loadParticipantes(data) {
                 </div>
             `).join('');
         }
-
-        // 2. Lista de Admin (detalhes + botão de edição/exclusão)
-        if (listaAdminDiv) {
-            if (isAdminLogged) {
-                listaAdminDiv.innerHTML = participantes.map(p => `
-                    <div class="participante-admin-item" data-id="${p.id}">
-                        <div class="info">
-                            <strong>${p.nome}</strong>
-                            <p>📱 ${p.whatsapp}</p>
-                            <p>💭 ${p.sugestoes}</p>
-                        </div>
-                        <div class="btn-group-admin">
-                            <button class="btn btn-test btn-editar" data-id="${p.id}">✏️ Editar</button>
-                            <button class="btn-excluir" data-id="${p.id}">🗑️ Excluir</button>
-                        </div>
-                    </div>
-                `).join('');
-                
-                // Adicionar event listeners aos novos botões
-                document.querySelectorAll('.btn-excluir').forEach(button => {
-                    button.addEventListener('click', (e) => {
-                        const nomeEl = e.target.closest('.participante-admin-item').querySelector('.info strong');
-                        const nome = nomeEl ? nomeEl.textContent.trim() : '';
-                        handleExcluirParticipante(e.target.dataset.id, nome, true);
-                    });
-                });
-
-                document.querySelectorAll('.btn-editar').forEach(button => {
-                    button.addEventListener('click', handleAbrirEdicao);
-                });
-
-            } else {
-                listaAdminDiv.innerHTML = '<p style="text-align: center; color: #999;">Faça o login de administrador para ver os detalhes e gerenciar participantes.</p>';
-            }
-        }
     } else {
         if (totalSpan) totalSpan.textContent = '0';
         if (listaDiv) listaDiv.innerHTML = '<p style="text-align: center; color: #999;">Nenhum participante inscrito ainda.</p>';
-        if (listaAdminDiv) listaAdminDiv.innerHTML = '';
     }
-}
-
-
-// Listener principal para o banco de dados
-onValue(ref(database, 'participantes'), (snapshot) => {
-    loadParticipantes(snapshot.val());
 });
-
-
-// ==========================================
-// GERENCIAR EDIÇÃO DE PARTICIPANTES (ADMIN)
-// ==========================================
-
-function handleAbrirEdicao(e) {
-    const id = e.target.dataset.id;
-    const dados = participantesData[id];
-
-    if (!dados) {
-        showAlert('Erro: Participante não encontrado!', 'error');
-        return;
-    }
-
-    // Pré-preenche o formulário
-    const edicaoId = document.getElementById('edicaoId');
-    const edicaoNome = document.getElementById('edicaoNome');
-    const edicaoWhatsapp = document.getElementById('edicaoWhatsapp');
-    const edicaoSugestoes = document.getElementById('edicaoSugestoes');
-    const nomeParticipanteEdicao = document.getElementById('nomeParticipanteEdicao');
-
-    if(edicaoId) edicaoId.value = id;
-    if(edicaoNome) edicaoNome.value = dados.nome;
-    if(edicaoWhatsapp) edicaoWhatsapp.value = dados.whatsapp;
-    if(edicaoSugestoes) edicaoSugestoes.value = dados.sugestoes;
-    if(nomeParticipanteEdicao) nomeParticipanteEdicao.textContent = dados.nome;
-
-    // Esconde a lista e mostra o formulário
-    const listaAdminParticipantes = document.getElementById('listaAdminParticipantes');
-    const formEdicaoContainer = document.getElementById('formEdicaoContainer');
-    if(listaAdminParticipantes) listaAdminParticipantes.classList.add('hidden');
-    if(formEdicaoContainer) formEdicaoContainer.classList.remove('hidden');
-
-    // Listener para o novo botão de Excluir dentro do formulário de edição
-    const btnExcluirEdicao = document.getElementById('btnExcluirEdicao');
-    if (btnExcluirEdicao) {
-        btnExcluirEdicao.onclick = () => {
-            handleExcluirParticipante(id, dados.nome, false); // false = exclusão do formulário
-        };
-    }
-    
-    // Listener para o botão Cancelar
-    const btnCancelarEdicao = document.getElementById('btnCancelarEdicao');
-    if (btnCancelarEdicao) {
-        btnCancelarEdicao.onclick = () => {
-            if(formEdicaoContainer) formEdicaoContainer.classList.add('hidden');
-            if(listaAdminParticipantes) listaAdminParticipantes.classList.remove('hidden');
-        };
-    }
-}
-
-
-const edicaoForm = document.getElementById('edicaoForm');
-if (edicaoForm) {
-    edicaoForm.addEventListener('submit', async function(e) {
-        e.preventDefault();
-
-        const id = document.getElementById('edicaoId').value;
-        const nome = document.getElementById('edicaoNome').value.trim();
-        const whatsapp = document.getElementById('edicaoWhatsapp').value.trim();
-        const sugestoes = document.getElementById('edicaoSugestoes').value.trim();
-
-        if (!nome || !whatsapp || !sugestoes) {
-            showAlert('Por favor, preencha todos os campos!', 'error');
-            return;
-        }
-
-        showLoading(true);
-
-        try {
-            const participanteRef = ref(database, `participantes/${id}`);
-            
-            // Usa SET para ATUALIZAR os dados no nó com o ID específico
-            await set(participanteRef, {
-                nome: nome,
-                whatsapp: whatsapp,
-                sugestoes: sugestoes,
-                dataInscricao: participantesData[id].dataInscricao // Mantém a data de inscrição original
-            });
-
-            showLoading(false);
-            showAlert(`✅ Participante ${nome} atualizado com sucesso!`, 'success');
-            
-            // Volta para a lista de participantes
-            const formEdicaoContainer = document.getElementById('formEdicaoContainer');
-            const listaAdminParticipantes = document.getElementById('listaAdminParticipantes');
-            if(formEdicaoContainer) formEdicaoContainer.classList.add('hidden');
-            if(listaAdminParticipantes) listaAdminParticipantes.classList.remove('hidden');
-
-        } catch (error) {
-            showLoading(false);
-            showAlert('Erro ao salvar edição: ' + (error.message || error), 'error');
-            console.error(error);
-        }
-    });
-}
-
-
-// ==========================================
-// ACESSO AO PAINEL ADMIN (LOGIN/LOGOUT) - CORRIGIDO
-// ==========================================
-
-const btnAcessoAdmin = document.getElementById('btnAcessoAdmin');
-if (btnAcessoAdmin) {
-    btnAcessoAdmin.addEventListener('click', function() {
-        const senhaEl = document.getElementById('senhaAdmin');
-        const senhaDigitada = senhaEl ? senhaEl.value.trim() : ''; // .trim() garante que espaços extras não quebrem
-        const senhaCorreta = SENHA_ADMIN.trim(); // .trim() na senha correta para garantir
-        
-        if (senhaDigitada === senhaCorreta) {
-            isAdminLogged = true; // Define o estado de login
-            
-            const adminLoginCard = document.getElementById('adminLoginCard');
-            const adminPanelCard = document.getElementById('adminPanelCard');
-
-            if(adminLoginCard) adminLoginCard.classList.add('hidden');
-            if(adminPanelCard) adminPanelCard.classList.remove('hidden');
-            if(senhaEl) senhaEl.value = ''; // Limpa a senha
-            
-            showAlert('✅ Acesso de Organizador liberado! Agora você pode gerenciar.', 'success');
-
-            // Recarrega a lista para mostrar os botões de exclusão/edição
-            onValue(ref(database, 'participantes'), (snapshot) => {
-                loadParticipantes(snapshot.val());
-            }, { once: true });
-
-        } else {
-            showAlert('Senha de acesso incorreta! Tente novamente.', 'error');
-        }
-    });
-}
-
-const btnSairAdmin = document.getElementById('btnSairAdmin');
-if (btnSairAdmin) {
-    btnSairAdmin.addEventListener('click', function() {
-        isAdminLogged = false; // Limpa o estado de login
-        
-        const adminLoginCard = document.getElementById('adminLoginCard');
-        const adminPanelCard = document.getElementById('adminPanelCard');
-        if(adminLoginCard) adminLoginCard.classList.remove('hidden');
-        if(adminPanelCard) adminPanelCard.classList.add('hidden');
-        
-        showAlert('🚪 Sessão de Organizador encerrada.', 'info');
-        
-        // Recarrega a lista para esconder os botões de exclusão e detalhes
-        onValue(ref(database, 'participantes'), (snapshot) => {
-            loadParticipantes(snapshot.val());
-        }, { once: true });
-    });
-}
 
 
 // ==========================================
 // ALGORITMO DE SORTEIO (COM CÓDIGOS) - REFORÇADO
 // ==========================================
-
+// Restaurado para a lógica robusta de círculo único
 function realizarSorteio(participantes) {
-    // Converter objeto de participantes para array com IDs
     const participantesArray = Object.entries(participantes).map(([id, dados]) => ({
         id: id,
         ...dados
@@ -458,18 +213,17 @@ function realizarSorteio(participantes) {
     }
 
     let tentativas = 0;
-    const maxTentativas = 500; // Aumentei o limite de tentativas
+    const maxTentativas = 500; // Limite de tentativas para garantir um bom sorteio
     
     while (tentativas < maxTentativas) {
-        let sorteados = [...participantesArray]; // Array de quem vai ser tirado
+        let sorteados = [...participantesArray];
         
-        // 1. Embaralhamento Fisher-Yates: Cria uma lista de quem vai ser tirado.
+        // Embaralhamento Fisher-Yates
         for (let i = sorteados.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
             [sorteados[i], sorteados[j]] = [sorteados[j], sorteados[i]];
         }
         
-        // 2. Mapeamento dos Resultados e Checagem Imediata (Ninguém tira a si mesmo)
         let resultado = {};
         let valido = true;
         
@@ -477,7 +231,7 @@ function realizarSorteio(participantes) {
             const sorteador = participantesArray[i];
             const tirado = sorteados[i];
             
-            // Checagem 1: Ninguém tira a si mesmo (Compara ID's para ser mais robusto)
+            // Checagem 1: Ninguém tira a si mesmo
             if (sorteador.id === tirado.id) {
                 valido = false;
                 break;
@@ -493,52 +247,44 @@ function realizarSorteio(participantes) {
             };
         }
         
-        // Se a checagem 1 falhou, tente novamente
         if (!valido) {
             tentativas++;
             continue;
         }
         
-        // 3. Checagem do Círculo Único
+        // Checagem 2: Círculo Único
         const participantesNomes = participantesArray.map(p => p.nome);
         const visitados = new Set();
         let atual = participantesNomes[0];
         
-        // Percorrer a cadeia de sorteios
         for (let i = 0; i < n; i++) {
-            if (visitados.has(atual)) break; // Ciclo interno detectado
+            if (visitados.has(atual)) break;
             visitados.add(atual);
             atual = resultado[atual].tirouNome;
         }
         
-        // Checagem 3: O ciclo é único se o número de visitados for igual ao número de participantes.
         if (visitados.size === n) {
-            // Sorteio VÁLIDO: Círculo único e sem auto-sorteio.
-            
+            // Sorteio VÁLIDO
             const codigos = {};
-            
-            // Gerar códigos e finalizar a estrutura de resultados
             for (const nomeSorteador of participantesNomes) {
                 const codigo = gerarCodigo();
                 resultado[nomeSorteador].codigo = codigo;
                 
-                // Criar índice por código para consulta rápida
                 codigos[codigo] = {
                     participante: nomeSorteador,
                     tirouNome: resultado[nomeSorteador].tirouNome,
                     dadosAmigo: resultado[nomeSorteador].dadosAmigo
                 };
             }
-            
             return { resultado, codigos };
         }
         
         tentativas++;
     }
     
-    // Se esgotou as tentativas (500), joga erro
     throw new Error(`Não foi possível realizar um sorteio válido após ${maxTentativas} tentativas. O número de participantes é ${n}. Tente novamente!`);
 }
+
 
 // ==========================================
 // BOTÃO DE SORTEAR TESTE (NÃO SALVA NO FIREBASE)
@@ -547,8 +293,11 @@ function realizarSorteio(participantes) {
 const btnSortearTeste = document.getElementById('btnSortearTeste');
 if (btnSortearTeste) {
     btnSortearTeste.addEventListener('click', async function() {
-        if (!isAdminLogged) {
-            showAlert('Acesso negado! Faça login como organizador.', 'error');
+        const senhaEl = document.getElementById('senhaAdmin');
+        const senha = senhaEl ? senhaEl.value.trim() : '';
+        
+        if (senha !== SENHA_ADMIN.trim()) {
+            showAlert('Senha incorreta! Apenas o organizador pode realizar o sorteio.', 'error');
             return;
         }
 
@@ -556,7 +305,7 @@ if (btnSortearTeste) {
 
         try {
             const snapshot = await new Promise((resolve) => {
-                onValue(ref(database, 'participantes'), resolve, { once: true });
+                onValue(ref(database, 'participantes'), resolve, { onlyOnce: true });
             });
             
             const participantes = snapshot.val();
@@ -569,13 +318,11 @@ if (btnSortearTeste) {
 
             const { resultado } = realizarSorteio(participantes);
             
-            // Buscar dados dos participantes para pegar os telefones
+            // ... (Lógica de exibição dos códigos de teste - Mantida) ...
             const telefonesPorNome = {};
-            if (participantes) {
-                Object.values(participantes).forEach(p => {
-                    telefonesPorNome[p.nome] = p.whatsapp;
-                });
-            }
+            Object.values(participantes).forEach(p => {
+                telefonesPorNome[p.nome] = p.whatsapp;
+            });
 
             const resultadoDiv = document.getElementById('resultadoSorteio');
             const urlSite = window.location.href.split('?')[0];
@@ -629,8 +376,11 @@ if (btnSortearTeste) {
 const btnSortear = document.getElementById('btnSortear');
 if (btnSortear) {
     btnSortear.addEventListener('click', async function() {
-        if (!isAdminLogged) {
-            showAlert('Acesso negado! Faça login como organizador.', 'error');
+        const senhaEl = document.getElementById('senhaAdmin');
+        const senha = senhaEl ? senhaEl.value.trim() : '';
+        
+        if (senha !== SENHA_ADMIN.trim()) { // Checa a senha digitada
+            showAlert('Senha incorreta! Apenas o organizador pode realizar o sorteio.', 'error');
             return;
         }
 
@@ -644,7 +394,7 @@ if (btnSortear) {
 
         try {
             const snapshot = await new Promise((resolve) => {
-                onValue(ref(database, 'participantes'), resolve, { once: true });
+                onValue(ref(database, 'participantes'), resolve, { onlyOnce: true });
             });
             
             const participantes = snapshot.val();
@@ -665,7 +415,7 @@ if (btnSortear) {
             });
             
             showLoading(false);
-            showAlert('🎲 Sorteio OFICIAL realizado com sucesso! Os códigos foram salvos. Clique em "Ver Resultados" para visualizar e enviar.', 'success');
+            showAlert('🎲 Sorteio OFICIAL realizado com sucesso! Os códigos foram salvos. Clique em "Ver Resultado" para visualizar e enviar.', 'success');
             createConfetti();
             
         } catch (error) {
@@ -677,22 +427,25 @@ if (btnSortear) {
 }
 
 // ==========================================
-// VERIFICAR INTEGRIDADE DO SORTEIO (ADMIN)
+// VERIFICAR INTEGRIDADE DO SORTEIO
 // ==========================================
 
 const btnVerificarSorteio = document.getElementById('btnVerificarSorteio');
 if (btnVerificarSorteio) {
     btnVerificarSorteio.addEventListener('click', async function() {
-        if (!isAdminLogged) {
-            showAlert('Acesso negado! Faça login como organizador.', 'error');
+        const senhaEl = document.getElementById('senhaAdmin');
+        const senha = senhaEl ? senhaEl.value.trim() : '';
+        
+        if (senha !== SENHA_ADMIN.trim()) { // Checa a senha digitada
+            showAlert('Senha incorreta! Apenas o organizador pode verificar o sorteio.', 'error');
             return;
         }
-        
+
         showLoading(true);
 
         try {
             const snapshot = await new Promise((resolve) => {
-                onValue(ref(database, 'sorteio'), resolve, { once: true });
+                onValue(ref(database, 'sorteio'), resolve, { onlyOnce: true });
             });
             
             const sorteioData = snapshot.val();
@@ -711,7 +464,6 @@ if (btnVerificarSorteio) {
             let pessoasComProblema = [];
             
             for (const pessoa of participantes) {
-                // CORREÇÃO: Usando normalizeName para comparar nomes de forma robusta
                 if (normalizeName(pessoa) === normalizeName(resultado[pessoa].tirouNome)) {
                     erroAutoSorteio = true;
                     pessoasComProblema.push(pessoa);
@@ -721,25 +473,23 @@ if (btnVerificarSorteio) {
             // VERIFICAÇÃO 2: Formar círculo único
             const visitados = new Set();
             let atual = participantes[0];
-            let passos = 0;
             let formaCirculoUnico = true;
             
-            while (passos < participantes.length) {
-                if (visitados.has(atual)) { // Ciclo interno detectado
-                    formaCirculoUnica = false; // Corrigido erro de digitação
-                    break;
+            for (let i = 0; i < participantes.length; i++) {
+                if (!resultado[atual]) { // Tratamento para erro de sorteio
+                     formaCirculoUnico = false;
+                     break;
                 }
+                if (visitados.has(atual)) break;
                 visitados.add(atual);
                 atual = resultado[atual].tirouNome;
-                passos++;
             }
             
-            // Se o loop terminou e o número de visitados não é igual ao total, não é um ciclo único.
             if (visitados.size !== participantes.length) {
-                formaCirculoUnica = false;
+                formaCirculoUnico = false;
             }
 
-            // VERIFICAÇÃO 3 e 4
+            // VERIFICAÇÃO 3 e 4 (Implícitas)
             let todosTiramAlguem = participantes.every(p => resultado[p].tirouNome);
             const tirados = new Set(participantes.map(p => resultado[p].tirouNome));
             let todosSaoTirados = participantes.every(p => tirados.has(p));
@@ -750,7 +500,6 @@ if (btnVerificarSorteio) {
             let html = '<div style="background: white; padding: 25px; border-radius: 15px; margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">';
             html += '<h4 style="color: var(--cor-primaria); margin-bottom: 20px; text-align: center; font-family: var(--fonte-titulo);">📊 Relatório de Verificação do Sorteio</h4>';
             
-            // Data do sorteio
             if (sorteioData.dataSorteio) {
                 const data = new Date(sorteioData.dataSorteio);
                 html += `<p style="text-align: center; color: #666; margin-bottom: 20px; border-bottom: 1px dashed #eee; padding-bottom: 15px;">Sorteio realizado em: ${data.toLocaleString('pt-BR')}</p>`;
@@ -770,7 +519,7 @@ if (btnVerificarSorteio) {
             html += `
                 <div style="padding: 15px; border-radius: 10px; ${formaCirculoUnico ? 'background: #d4edda; border-left: 4px solid #28a745;' : 'background: #f8d7da; border-left: 4px solid #dc3545;'}">
                     <strong>${formaCirculoUnico ? '✅' : '❌'} Forma um Círculo Único</strong>
-                    ${formaCirculoUnico ? '<p style="color: #155724; margin-top: 10px;">Perfeito! O sorteio forma um círculo completo, sem grupos isolados.</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! O sorteio forma múltiplos círculos separados, pode haver problema de quem fica no final.</p>'}
+                    ${formaCirculoUnico ? '<p style="color: #155724; margin-top: 10px;">Perfeito! O sorteio forma um círculo completo, sem grupos isolados.</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! O sorteio forma múltiplos círculos separados.</p>'}
                     <p style="margin-top: 10px; color: #666;">Participantes no ciclo: ${visitados.size} de ${participantes.length}</p>
                 </div>
             `;
@@ -779,7 +528,7 @@ if (btnVerificarSorteio) {
             html += `
                 <div style="padding: 15px; border-radius: 10px; ${todosTiramAlguem ? 'background: #d4edda; border-left: 4px solid #28a745;' : 'background: #f8d7da; border-left: 4px solid #dc3545;'}">
                     <strong>${todosTiramAlguem ? '✅' : '❌'} Todos Tiram Alguém</strong>
-                    ${todosTiramAlguem ? '<p style="color: #155724; margin-top: 10px;">Todos os participantes têm um amigo secreto!</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! Alguns participantes não tiraram ninguém. (Isto deve ser raro se o sorteio foi oficial)</p>'}
+                    ${todosTiramAlguem ? '<p style="color: #155724; margin-top: 10px;">Todos os participantes têm um amigo secreto!</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! Alguns participantes não tiraram ninguém.</p>'}
                 </div>
             `;
             
@@ -809,17 +558,17 @@ if (btnVerificarSorteio) {
                 html += '<h4 style="color: var(--cor-primaria); margin-bottom: 15px; text-align: center; font-family: var(--fonte-titulo);">🔄 Sequência do Círculo</h4>';
                 html += '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;">';
                 
-                let atualSeq = participantes[0];
+                let atual = participantes[0];
                 let count = 0;
                 do {
-                    html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-secundaria); font-weight: 600; white-space: nowrap;">${atualSeq}</div>`;
-                    html += '<div style="font-size: 1.5em; color: #999;">→</div>';
-                    atualSeq = resultado[atualSeq].tirouNome;
+                    html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-secundaria); font-weight: 600;">${atual}</div>`;
+                    html += '<div style="font-size: 1.5em;">→</div>';
+                    atual = resultado[atual].tirouNome;
                     count++;
                     if (count > participantes.length) break; // Segurança contra loop infinito
-                } while (atualSeq !== participantes[0]);
+                } while (atual !== participantes[0]);
                 
-                html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-sucesso); font-weight: 600; white-space: nowrap;">${participantes[0]} (Início)</div>`;
+                html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-sucesso); font-weight: 600;">${participantes[0]} (Início)</div>`;
                 html += '</div></div>';
             }
             
@@ -849,15 +598,19 @@ if (btnVerificarSorteio) {
 const btnVerSorteio = document.getElementById('btnVerSorteio');
 if (btnVerSorteio) {
     btnVerSorteio.addEventListener('click', async function() {
-        if (!isAdminLogged) {
-            showAlert('Acesso negado! Faça login como organizador.', 'error');
+        const senhaEl = document.getElementById('senhaAdmin');
+        const senha = senhaEl ? senhaEl.value.trim() : '';
+        
+        if (senha !== SENHA_ADMIN.trim()) {
+            showAlert('Senha incorreta! Apenas o organizador pode ver o resultado.', 'error');
             return;
         }
+
         showLoading(true);
 
         try {
             const snapshot = await new Promise((resolve) => {
-                onValue(ref(database, 'sorteio'), resolve, { once: true });
+                onValue(ref(database, 'sorteio'), resolve, { onlyOnce: true });
             });
             
             const sorteioData = snapshot.val();
@@ -870,7 +623,7 @@ if (btnVerSorteio) {
 
             // Buscar dados dos participantes para pegar os telefones
             const participantesSnapshot = await new Promise((resolve) => {
-                onValue(ref(database, 'participantes'), resolve, { once: true });
+                onValue(ref(database, 'participantes'), resolve, { onlyOnce: true });
             });
             
             const participantesData = participantesSnapshot.val();
@@ -902,7 +655,7 @@ if (btnVerSorteio) {
                 const linkWhatsApp = telefone ? `https://wa.me/55${telefoneNumeros}?text=${mensagem}` : '#';
                 
                 html += `
-                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;" class="sorteio-resultado">
+                    <div class="sorteio-resultado" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
                         <div style="flex: 1; min-width: 200px;">
                             <strong>👤 ${pessoa}</strong><br>
                             <strong style="color: #4CAF50; font-size: 1.2em;">🔑 ${dados.codigo}</strong>
@@ -927,184 +680,122 @@ if (btnVerSorteio) {
                 `;
             }
             
-            if (resultadoDiv) resultadoDiv.innerHTML = html;
+            resultadoDiv.innerHTML = html;
             showLoading(false);
             showAlert('Códigos carregados! Use os botões para enviar via WhatsApp.', 'success');
             
         } catch (error) {
             showLoading(false);
-            showAlert('Erro ao carregar resultado: ' + (error.message || error), 'error');
+            showAlert('Erro ao carregar resultado: ' + error.message, 'error');
             console.error(error);
         }
     });
 }
 
 // ==========================================
-// CONSULTAR AMIGO SECRETO (PARTICIPANTE)
+// CONSULTAR AMIGO SECRETO (PARTICIPANTE - SEM TELEFONE)
 // ==========================================
-const btnConsultar = document.getElementById('btnConsultar');
-if (btnConsultar) {
-    btnConsultar.addEventListener('click', async function() {
-        const codigoInput = document.getElementById('codigoConsulta');
-        const codigo = codigoInput ? codigoInput.value.trim().toUpperCase() : '';
+
+document.getElementById('btnConsultar').addEventListener('click', async function() {
+    const codigo = document.getElementById('codigoConsulta').value.trim().toUpperCase();
+    
+    if (!codigo) {
+        showAlert('Por favor, digite seu código de acesso!', 'error');
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const snapshot = await new Promise((resolve) => {
+            onValue(ref(database, 'sorteio'), resolve, { onlyOnce: true });
+        });
         
-        if (!codigo) {
-            showAlert('Por favor, digite seu código de acesso!', 'error');
+        const sorteioData = snapshot.val();
+        
+        if (!sorteioData || !sorteioData.codigos) {
+            showLoading(false);
+            showAlert('O sorteio ainda não foi realizado. Aguarde o organizador!', 'info');
             return;
         }
 
-        showLoading(true);
-
-        try {
-            const snapshot = await new Promise((resolve) => {
-                onValue(ref(database, 'sorteio'), resolve, { once: true });
-            });
-            
-            const sorteioData = snapshot.val();
-            
-            if (!sorteioData || !sorteioData.codigos) {
-                showLoading(false);
-                showAlert('O sorteio ainda não foi realizado. Aguarde o organizador!', 'info');
-                return;
-            }
-
-            const codigos = sorteioData.codigos;
-            
-            if (!codigos[codigo]) {
-                showLoading(false);
-                showAlert('Código inválido! Verifique se digitou corretamente.', 'error');
-                return;
-            }
-
-            const dados = codigos[codigo];
-            const resultadoDiv = document.getElementById('resultadoConsulta');
-            
-            // Garantir que estamos pegando o nome correto
-            const nomeAmigoSecreto = dados.tirouNome || (dados.dadosAmigo && dados.dadosAmigo.nome) || '—';
-            const sugestoesAmigo = (dados.dadosAmigo && dados.dadosAmigo.sugestoes) || '';
-            
-            if (resultadoDiv) {
-                resultadoDiv.innerHTML = `
-                    <div class="resultado-amigo">
-                        <h4>🎉 Seu Amigo Secreto é:</h4>
-                        <div class="amigo-nome">🎁 ${nomeAmigoSecreto}</div>
-                        <div class="amigo-info">
-                            <p><strong>💭 Sugestões de Presente:</strong></p>
-                            <p style="font-size: 1.05em; line-height: 1.8;">${sugestoesAmigo}</p>
-                        </div>
-                        <p style="color: #666; margin-top: 15px; font-size: 0.9em; text-align: center;">
-                            💝 Lembre-se: o presente deve custar entre R$ 20,00 e R$ 30,00. 
-                            Capriche na criatividade!
-                        </p>
-                    </div>
-                `;
-            }
-            
+        const codigos = sorteioData.codigos;
+        
+        if (!codigos[codigo]) {
             showLoading(false);
-            createConfetti();
-            
-        } catch (error) {
-            showLoading(false);
-            showAlert('Erro ao consultar: ' + (error.message || error), 'error');
-            console.error('Erro completo:', error);
+            showAlert('Código inválido! Verifique se digitou corretamente.', 'error');
+            return;
         }
-    });
-}
+
+        const dados = codigos[codigo];
+        const resultadoDiv = document.getElementById('resultadoConsulta');
+        
+        // Garantir que estamos pegando o nome correto
+        const nomeAmigoSecreto = dados.tirouNome || dados.dadosAmigo.nome;
+        const sugestoesAmigo = dados.dadosAmigo.sugestoes;
+        
+        resultadoDiv.innerHTML = `
+            <div class="resultado-amigo">
+                <h4>🎉 Seu Amigo Secreto é:</h4>
+                <div class="amigo-nome">🎁 ${nomeAmigoSecreto}</div>
+                <div class="amigo-info">
+                    <p><strong>💭 Sugestões de Presente:</strong></p>
+                    <p style="font-size: 1.05em; line-height: 1.8;">${sugestoesAmigo}</p>
+                </div>
+                <p style="color: #666; margin-top: 15px; font-size: 0.9em; text-align: center;">
+                    💝 Lembre-se: o presente deve custar entre R$ 20,00 e R$ 30,00. 
+                    Capriche na criatividade!
+                </p>
+            </div>
+        `;
+        
+        showLoading(false);
+        createConfetti();
+        
+    } catch (error) {
+        showLoading(false);
+        showAlert('Erro ao consultar: ' + error.message, 'error');
+        console.error('Erro completo:', error);
+    }
+});
 
 // Formatar código em tempo real
-const codigoConsultaEl = document.getElementById('codigoConsulta');
-if (codigoConsultaEl) {
-    codigoConsultaEl.addEventListener('input', function(e) {
-        e.target.value = e.target.value.toUpperCase();
-    });
-}
-
+document.getElementById('codigoConsulta').addEventListener('input', function(e) {
+    e.target.value = e.target.value.toUpperCase();
+});
 
 // ==========================================
-// APAGAR ÚLTIMO SORTEIO (ADMIN)
+// LIMPAR DADOS
 // ==========================================
-const btnApagarSorteio = document.getElementById('btnApagarSorteio');
-if (btnApagarSorteio) {
-    btnApagarSorteio.addEventListener('click', async function() {
-        if (!isAdminLogged) {
-            showAlert('Acesso negado! Faça login como organizador.', 'error');
-            return;
-        }
 
-        const confirmacao = confirm('⚠️ ATENÇÃO! Isso vai apagar APENAS o resultado do sorteio, permitindo que você sorteie novamente.\n\nOs participantes CADASTRADOS NÃO serão apagados. Tem certeza?');
+document.getElementById('btnLimpar').addEventListener('click', async function() {
+    const senha = document.getElementById('senhaAdmin').value.trim(); // .trim() para robustez
+    
+    if (senha !== SENHA_ADMIN.trim()) {
+        showAlert('Senha incorreta! Apenas o organizador pode limpar os dados.', 'error');
+        return;
+    }
+
+    const confirmacao = confirm('⚠️ ATENÇÃO! Isso vai apagar TODOS os dados (participantes e sorteio). Tem certeza absoluta?');
+    
+    if (!confirmacao) {
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        await remove(ref(database, 'participantes'));
+        await remove(ref(database, 'sorteio'));
         
-        if (!confirmacao) {
-            return;
-        }
-
-        showLoading(true);
-
-        try {
-            await remove(ref(database, 'sorteio'));
-            
-            const resultadoDiv = document.getElementById('resultadoSorteio');
-            if(resultadoDiv) resultadoDiv.innerHTML = '';
-            
-            showLoading(false);
-            showAlert('✅ Último sorteio apagado com sucesso! Você já pode realizar um novo sorteio.', 'success');
-            
-        } catch (error) {
-            showLoading(false);
-            showAlert('Erro ao apagar sorteio: ' + (error.message || error), 'error');
-            console.error(error);
-        }
-    });
-}
-
-
-// ==========================================
-// LIMPAR TODOS OS DADOS (ADMIN)
-// ==========================================
-
-const btnLimpar = document.getElementById('btnLimpar');
-if (btnLimpar) {
-    btnLimpar.addEventListener('click', async function() {
-        if (!isAdminLogged) {
-            showAlert('Acesso negado! Faça login como organizador.', 'error');
-            return;
-        }
-        const confirmacao = confirm('⚠️ ATENÇÃO! Isso vai apagar TODOS os dados (participantes e sorteio). Tem certeza absoluta?');
+        document.getElementById('resultadoSorteio').innerHTML = '';
         
-        if (!confirmacao) {
-            return;
-        }
-
-        showLoading(true);
-
-        try {
-            await remove(ref(database, 'participantes'));
-            await remove(ref(database, 'sorteio'));
-            
-            const resultadoDiv = document.getElementById('resultadoSorteio');
-            if(resultadoDiv) resultadoDiv.innerHTML = '';
-            const listaAdminDiv = document.getElementById('listaAdminParticipantes');
-            if(listaAdminDiv) listaAdminDiv.innerHTML = '';
-            
-            showLoading(false);
-            showAlert('✅ Todos os dados foram removidos com sucesso!', 'success');
-            
-        } catch (error) {
-            showLoading(false);
-            showAlert('Erro ao limpar dados: ' + (error.message || error), 'error');
-            console.error(error);
-        }
-    });
-}
-
-// ==========================================
-// INICIALIZAÇÃO: garantir estado do painel
-// ==========================================
-(function initAdminVisibility() {
-    const adminPanel = document.getElementById('adminPanelCard');
-    const adminLogin = document.getElementById('adminLoginCard');
-
-    // Se painel existir, garantir que esteja oculto inicialmente
-    if (adminPanel) adminPanel.classList.add('hidden');
-    // Login deve estar visível
-    if (adminLogin) adminLogin.classList.remove('hidden');
-})();
+        showLoading(false);
+        showAlert('✅ Todos os dados foram removidos com sucesso!', 'success');
+        
+    } catch (error) {
+        showLoading(false);
+        showAlert('Erro ao limpar dados: ' + error.message, 'error');
+        console.error(error);
+    }
+});
