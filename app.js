@@ -1,5 +1,3 @@
---- START OF FILE app.js ---
-
 // ==========================================
 // IMPORTAÇÕES
 // ==========================================
@@ -1110,3 +1108,4 @@ if (btnLimpar) {
     // Login deve estar visível
     if (adminLogin) adminLogin.classList.remove('hidden');
 })();
+
