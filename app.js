@@ -172,7 +172,7 @@ if (inscricaoForm) {
 // ==========================================
 // CARREGAR PARTICIPANTES (APENAS NOMES)
 // ==========================================
-// Simplificado para apenas carregar a lista pública
+// Apenas carrega a lista pública (não há painel de admin separado nesta versão)
 onValue(ref(database, 'participantes'), (snapshot) => {
     const data = snapshot.val();
     const listaDiv = document.getElementById('listaParticipantes');
