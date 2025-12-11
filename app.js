@@ -726,7 +726,7 @@ if (btnVerificarSorteio) {
             
             while (passos < participantes.length) {
                 if (visitados.has(atual)) { // Ciclo interno detectado
-                    formaCirculoUnico = false;
+                    formaCirculoUnica = false; // Corrigido erro de digitação
                     break;
                 }
                 visitados.add(atual);
@@ -736,7 +736,7 @@ if (btnVerificarSorteio) {
             
             // Se o loop terminou e o número de visitados não é igual ao total, não é um ciclo único.
             if (visitados.size !== participantes.length) {
-                formaCirculoUnico = false;
+                formaCirculoUnica = false;
             }
 
             // VERIFICAÇÃO 3 e 4
@@ -1097,4 +1097,14 @@ if (btnLimpar) {
 }
 
 // ==========================================
-// INICIALI
+// INICIALIZAÇÃO: garantir estado do painel
+// ==========================================
+(function initAdminVisibility() {
+    const adminPanel = document.getElementById('adminPanelCard');
+    const adminLogin = document.getElementById('adminLoginCard');
+
+    // Se painel existir, garantir que esteja oculto inicialmente
+    if (adminPanel) adminPanel.classList.add('hidden');
+    // Login deve estar visível
+    if (adminLogin) adminLogin.classList.remove('hidden');
+})();
