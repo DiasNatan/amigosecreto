@@ -10,12 +10,6 @@ const app = initializeApp(firebaseConfig);
 const database = getDatabase(app);
 
 // ==========================================
-// VARIÁVEL DE ESTADO
-// ==========================================
-let isAdminLogged = false;
-let participantesData = {}; // Armazena dados dos participantes para edição
-
-// ==========================================
 // FUNÇÕES AUXILIARES
 // ==========================================
 
@@ -74,13 +68,6 @@ function gerarCodigo() {
     }
     return codigo;
 }
-
-// Função auxiliar para normalizar o nome (remover emojis e espaços que podem dar erro na checagem)
-function normalizeName(name) {
-    // Remove emojis/caracteres especiais e converte para minúsculas
-    return name.trim().replace(/[^\w\s]/gi, '').toLowerCase();
-}
-
 
 // ==========================================
 // CONTAGEM REGRESSIVA
@@ -169,227 +156,31 @@ document.getElementById('inscricaoForm').addEventListener('submit', async functi
 });
 
 // ==========================================
-// EXCLUIR PARTICIPANTE (ADMIN)
+// CARREGAR PARTICIPANTES (APENAS NOMES)
 // ==========================================
 
-async function handleExcluirParticipante(participanteId, nomeParticipante, isFromList = true) {
-    if (!isAdminLogged) {
-        showAlert('Acesso negado! Faça login como organizador.', 'error');
-        return;
-    }
-
-    const confirmacao = confirm(`⚠️ Tem certeza que deseja EXCLUIR o participante ${nomeParticipante}?\n\nIsso é irreversível e irá bagunçar o sorteio se ele já tiver sido feito!`);
-    
-    if (!confirmacao) {
-        return;
-    }
-
-    showLoading(true);
-
-    try {
-        const participanteRef = ref(database, `participantes/${participanteId}`);
-        await remove(participanteRef);
-        
-        // Se a exclusão vier do formulário de edição, volte para a lista
-        if (!isFromList) {
-            document.getElementById('formEdicaoContainer').classList.add('hidden');
-        }
-
-        showLoading(false);
-        showAlert(`✅ Participante ${nomeParticipante} removido com sucesso.`, 'success');
-        
-    } catch (error) {
-        showLoading(false);
-        showAlert('Erro ao remover participante: ' + error.message, 'error');
-        console.error(error);
-    }
-}
-
-
-// ==========================================
-// FUNÇÃO CENTRAL DE CARREGAMENTO DE PARTICIPANTES
-// ==========================================
-
-function loadParticipantes(data) {
-    // Armazena a lista bruta para fácil acesso (necessário para a edição)
-    participantesData = data || {}; 
-    
+onValue(ref(database, 'participantes'), (snapshot) => {
+    const data = snapshot.val();
     const listaDiv = document.getElementById('listaParticipantes');
-    const listaAdminDiv = document.getElementById('listaAdminParticipantes');
     const totalSpan = document.getElementById('totalParticipantes');
-
+    
     if (data) {
-        // Conversão dos dados em Array (preserva a ID do Firebase)
-        const participantes = Object.entries(data).map(([id, dados]) => ({ id, ...dados }));
+        const participantes = Object.values(data);
         totalSpan.textContent = participantes.length;
-
-        // 1. Lista Pública (apenas nomes)
+        
         listaDiv.innerHTML = participantes.map(p => `
             <div class="participante-item">
                 <strong>👤 ${p.nome}</strong>
             </div>
         `).join('');
-
-        // 2. Lista de Admin (detalhes + botão de edição/exclusão)
-        if (isAdminLogged) {
-            listaAdminDiv.innerHTML = participantes.map(p => `
-                <div class="participante-admin-item" data-id="${p.id}">
-                    <div class="info">
-                        <strong>${p.nome}</strong>
-                        <p>📱 ${p.whatsapp}</p>
-                        <p>💭 ${p.sugestoes}</p>
-                    </div>
-                    <div class="btn-group-admin" style="display: flex; gap: 10px;">
-                        <button class="btn btn-test btn-editar" data-id="${p.id}">✏️ Editar</button>
-                        <button class="btn-excluir" data-id="${p.id}">🗑️ Excluir</button>
-                    </div>
-                </div>
-            `).join('');
-            
-            // Adicionar event listeners aos novos botões
-            document.querySelectorAll('.btn-excluir').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    // Chama a função de exclusão com o ID e nome
-                    const nome = e.target.closest('.participante-admin-item').querySelector('.info strong').textContent.trim();
-                    handleExcluirParticipante(e.target.dataset.id, nome, true);
-                });
-            });
-
-            document.querySelectorAll('.btn-editar').forEach(button => {
-                button.addEventListener('click', handleAbrirEdicao);
-            });
-
-        } else {
-            listaAdminDiv.innerHTML = '<p style="text-align: center; color: #999;">Faça o login de administrador para ver os detalhes e gerenciar participantes.</p>';
-        }
     } else {
         totalSpan.textContent = '0';
         listaDiv.innerHTML = '<p style="text-align: center; color: #999;">Nenhum participante inscrito ainda.</p>';
-        listaAdminDiv.innerHTML = '';
-    }
-}
-
-
-// Listener principal para o banco de dados
-onValue(ref(database, 'participantes'), (snapshot) => {
-    loadParticipantes(snapshot.val());
-});
-
-
-// ==========================================
-// GERENCIAR EDIÇÃO DE PARTICIPANTES (ADMIN)
-// ==========================================
-
-function handleAbrirEdicao(e) {
-    const id = e.target.dataset.id;
-    const dados = participantesData[id];
-
-    if (!dados) {
-        showAlert('Erro: Participante não encontrado!', 'error');
-        return;
-    }
-
-    // Pré-preenche o formulário
-    document.getElementById('edicaoId').value = id;
-    document.getElementById('edicaoNome').value = dados.nome;
-    document.getElementById('edicaoWhatsapp').value = dados.whatsapp;
-    document.getElementById('edicaoSugestoes').value = dados.sugestoes;
-    document.getElementById('nomeParticipanteEdicao').textContent = dados.nome; // Atualiza o título do card
-
-    // Esconde a lista e mostra o formulário
-    document.getElementById('listaAdminParticipantes').classList.add('hidden');
-    document.getElementById('formEdicaoContainer').classList.remove('hidden');
-
-    // Listener para o novo botão de Excluir dentro do formulário de edição
-    document.getElementById('btnExcluirEdicao').onclick = () => {
-        handleExcluirParticipante(id, dados.nome, false); // false = exclusão do formulário
-    };
-    
-    // Listener para o botão Cancelar
-    document.getElementById('btnCancelarEdicao').onclick = () => {
-        document.getElementById('formEdicaoContainer').classList.add('hidden');
-        document.getElementById('listaAdminParticipantes').classList.remove('hidden');
-    };
-}
-
-
-document.getElementById('edicaoForm').addEventListener('submit', async function(e) {
-    e.preventDefault();
-
-    const id = document.getElementById('edicaoId').value;
-    const nome = document.getElementById('edicaoNome').value.trim();
-    const whatsapp = document.getElementById('edicaoWhatsapp').value.trim();
-    const sugestoes = document.getElementById('edicaoSugestoes').value.trim();
-
-    if (!nome || !whatsapp || !sugestoes) {
-        showAlert('Por favor, preencha todos os campos!', 'error');
-        return;
-    }
-
-    showLoading(true);
-
-    try {
-        const participanteRef = ref(database, `participantes/${id}`);
-        
-        // Usa SET para ATUALIZAR os dados no nó com o ID específico
-        await set(participanteRef, {
-            nome: nome,
-            whatsapp: whatsapp,
-            sugestoes: sugestoes,
-            dataInscricao: participantesData[id].dataInscricao // Mantém a data de inscrição original
-        });
-
-        showLoading(false);
-        showAlert(`✅ Participante ${nome} atualizado com sucesso!`, 'success');
-        
-        // Volta para a lista de participantes
-        document.getElementById('formEdicaoContainer').classList.add('hidden');
-        document.getElementById('listaAdminParticipantes').classList.remove('hidden');
-
-    } catch (error) {
-        showLoading(false);
-        showAlert('Erro ao salvar edição: ' + error.message, 'error');
-        console.error(error);
     }
 });
 
-
 // ==========================================
-// ACESSO AO PAINEL ADMIN (LOGIN/LOGOUT)
-// ==========================================
-
-document.getElementById('btnAcessoAdmin').addEventListener('click', function() {
-    const senha = document.getElementById('senhaAcessoAdmin').value;
-    
-    if (senha === SENHA_ADMIN) {
-        isAdminLogged = true;
-        document.getElementById('adminLoginCard').classList.add('hidden');
-        document.getElementById('adminPanelCard').classList.remove('hidden');
-        document.getElementById('senhaAcessoAdmin').value = ''; // Limpa a senha
-        showAlert('✅ Acesso de Organizador liberado! Agora você pode gerenciar.', 'success');
-        // Recarrega a lista para mostrar os botões de exclusão/edição
-        onValue(ref(database, 'participantes'), (snapshot) => {
-            loadParticipantes(snapshot.val());
-        }, { onlyOnce: true });
-    } else {
-        showAlert('Senha de acesso incorreta! Tente novamente.', 'error');
-    }
-});
-
-document.getElementById('btnSairAdmin').addEventListener('click', function() {
-    isAdminLogged = false;
-    document.getElementById('adminLoginCard').classList.remove('hidden');
-    document.getElementById('adminPanelCard').classList.add('hidden');
-    showAlert('🚪 Sessão de Organizador encerrada.', 'info');
-    // Recarrega a lista para esconder os botões de exclusão e detalhes
-    onValue(ref(database, 'participantes'), (snapshot) => {
-        loadParticipantes(snapshot.val());
-    }, { onlyOnce: true });
-});
-
-
-// ==========================================
-// ALGORITMO DE SORTEIO (COM CÓDIGOS) - REFORÇADO
+// ALGORITMO DE SORTEIO (COM CÓDIGOS)
 // ==========================================
 
 function realizarSorteio(participantes) {
@@ -406,87 +197,64 @@ function realizarSorteio(participantes) {
     }
 
     let tentativas = 0;
-    const maxTentativas = 500; // Aumentei o limite de tentativas
+    const maxTentativas = 100;
     
     while (tentativas < maxTentativas) {
-        let sorteados = [...participantesArray]; // Array de quem vai ser tirado
+        // Criar cópia embaralhada dos índices
+        let indices = [...Array(n).keys()];
         
-        // 1. Embaralhamento Fisher-Yates: Cria uma lista de quem vai ser tirado.
-        for (let i = sorteados.length - 1; i > 0; i--) {
+        // Embaralhamento Fisher-Yates
+        for (let i = indices.length - 1; i > 0; i--) {
             const j = Math.floor(Math.random() * (i + 1));
-            [sorteados[i], sorteados[j]] = [sorteados[j], sorteados[i]];
+            [indices[i], indices[j]] = [indices[j], indices[i]];
         }
         
-        // 2. Mapeamento dos Resultados e Checagem Imediata (Ninguém tira a si mesmo)
-        let resultado = {};
+        // Verificar se ninguém tirou a si mesmo
         let valido = true;
-        
         for (let i = 0; i < n; i++) {
-            const sorteador = participantesArray[i];
-            const tirado = sorteados[i];
-            
-            // Checagem 1: Ninguém tira a si mesmo
-            if (sorteador.id === tirado.id) {
+            if (i === indices[i]) {
                 valido = false;
                 break;
             }
-            
-            resultado[sorteador.nome] = {
-                tirouNome: tirado.nome,
-                dadosAmigo: {
-                    nome: tirado.nome,
-                    whatsapp: tirado.whatsapp,
-                    sugestoes: tirado.sugestoes
-                },
-                // Código será gerado se for válido
-            };
         }
         
-        // Se a checagem 1 falhou, tente novamente
-        if (!valido) {
-            tentativas++;
-            continue;
-        }
-        
-        // 3. Checagem do Círculo Único
-        const participantesNomes = participantesArray.map(p => p.nome);
-        const visitados = new Set();
-        let atual = participantesNomes[0];
-        
-        // Percorrer a cadeia de sorteios
-        for (let i = 0; i < n; i++) {
-            if (visitados.has(atual)) break; // Loop detectado
-            visitados.add(atual);
-            atual = resultado[atual].tirouNome;
-        }
-        
-        // Checagem 3: O ciclo é único se o número de visitados for igual ao número de participantes.
-        if (visitados.size === n) {
-            // Sorteio VÁLIDO: Círculo único e sem auto-sorteio.
-            
+        if (valido) {
+            const resultado = {};
             const codigos = {};
             
-            // Gerar códigos e finalizar a estrutura de resultados
-            for (const nomeSorteador of participantesNomes) {
+            for (let i = 0; i < n; i++) {
+                const participante = participantesArray[i];
+                const amigoSecreto = participantesArray[indices[i]];
                 const codigo = gerarCodigo();
-                resultado[nomeSorteador].codigo = codigo;
+                
+                resultado[participante.nome] = {
+                    tirouNome: amigoSecreto.nome,
+                    dadosAmigo: {
+                        nome: amigoSecreto.nome,
+                        whatsapp: amigoSecreto.whatsapp,
+                        sugestoes: amigoSecreto.sugestoes
+                    },
+                    codigo: codigo
+                };
                 
                 // Criar índice por código para consulta rápida
                 codigos[codigo] = {
-                    participante: nomeSorteador,
-                    tirouNome: resultado[nomeSorteador].tirouNome,
-                    dadosAmigo: resultado[nomeSorteador].dadosAmigo
+                    participante: participante.nome,
+                    tirouNome: amigoSecreto.nome,
+                    dadosAmigo: {
+                        nome: amigoSecreto.nome,
+                        whatsapp: amigoSecreto.whatsapp,
+                        sugestoes: amigoSecreto.sugestoes
+                    }
                 };
             }
-            
             return { resultado, codigos };
         }
         
         tentativas++;
     }
     
-    // Se esgotou as tentativas (500), joga erro
-    throw new Error('Não foi possível realizar um sorteio válido após 500 tentativas. Tente novamente!');
+    throw new Error('Não foi possível realizar um sorteio válido. Tente novamente!');
 }
 
 // ==========================================
@@ -494,8 +262,10 @@ function realizarSorteio(participantes) {
 // ==========================================
 
 document.getElementById('btnSortearTeste').addEventListener('click', async function() {
-    if (!isAdminLogged) {
-        showAlert('Acesso negado! Faça login como organizador.', 'error');
+    const senha = document.getElementById('senhaAdmin').value;
+    
+    if (senha !== SENHA_ADMIN) {
+        showAlert('Senha incorreta! Apenas o organizador pode realizar o sorteio.', 'error');
         return;
     }
 
@@ -514,7 +284,7 @@ document.getElementById('btnSortearTeste').addEventListener('click', async funct
             return;
         }
 
-        const { resultado } = realizarSorteio(participantes);
+        const { resultado, codigos } = realizarSorteio(participantes);
         
         // Buscar dados dos participantes para pegar os telefones
         const telefonesPorNome = {};
@@ -571,8 +341,10 @@ document.getElementById('btnSortearTeste').addEventListener('click', async funct
 // ==========================================
 
 document.getElementById('btnSortear').addEventListener('click', async function() {
-    if (!isAdminLogged) {
-        showAlert('Acesso negado! Faça login como organizador.', 'error');
+    const senha = document.getElementById('senhaAdmin').value;
+    
+    if (senha !== SENHA_ADMIN) {
+        showAlert('Senha incorreta! Apenas o organizador pode realizar o sorteio.', 'error');
         return;
     }
 
@@ -607,7 +379,7 @@ document.getElementById('btnSortear').addEventListener('click', async function()
         });
         
         showLoading(false);
-        showAlert('🎲 Sorteio OFICIAL realizado com sucesso! Os códigos foram salvos. Clique em "Ver Resultados" para visualizar e enviar.', 'success');
+        showAlert('🎲 Sorteio OFICIAL realizado com sucesso! Os códigos foram salvos. Clique em "Ver Resultado" para visualizar e enviar.', 'success');
         createConfetti();
         
     } catch (error) {
@@ -618,12 +390,14 @@ document.getElementById('btnSortear').addEventListener('click', async function()
 });
 
 // ==========================================
-// VERIFICAR INTEGRIDADE DO SORTEIO (ADMIN)
+// VERIFICAR INTEGRIDADE DO SORTEIO
 // ==========================================
 
-document.getElementById('btnVerificarSorteio').addEventListener('click', async function() {
-    if (!isAdminLogged) {
-        showAlert('Acesso negado! Faça login como organizador.', 'error');
+document.getElementById('btnVerificar').addEventListener('click', async function() {
+    const senha = document.getElementById('senhaAdmin').value;
+    
+    if (senha !== SENHA_ADMIN) {
+        showAlert('Senha incorreta! Apenas o organizador pode verificar o sorteio.', 'error');
         return;
     }
 
@@ -650,8 +424,7 @@ document.getElementById('btnVerificarSorteio').addEventListener('click', async f
         let pessoasComProblema = [];
         
         for (const pessoa of participantes) {
-            // CORREÇÃO: Usando normalizeName para comparar nomes de forma robusta (ignora emojis/espaços)
-            if (normalizeName(pessoa) === normalizeName(resultado[pessoa].tirouNome)) {
+            if (pessoa === resultado[pessoa].tirouNome) {
                 erroAutoSorteio = true;
                 pessoasComProblema.push(pessoa);
             }
@@ -687,13 +460,13 @@ document.getElementById('btnVerificarSorteio').addEventListener('click', async f
         // Gerar relatório visual
         const resultadoDiv = document.getElementById('resultadoSorteio');
         
-        let html = '<div style="background: white; padding: 25px; border-radius: 15px; margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">';
-        html += '<h4 style="color: var(--cor-primaria); margin-bottom: 20px; text-align: center; font-family: var(--fonte-titulo);">📊 Relatório de Verificação do Sorteio</h4>';
+        let html = '<div style="background: white; padding: 25px; border-radius: 15px; margin-top: 20px;">';
+        html += '<h4 style="color: var(--cor-primaria); margin-bottom: 20px; text-align: center;">📊 Relatório de Verificação do Sorteio</h4>';
         
         // Data do sorteio
         if (sorteioData.dataSorteio) {
             const data = new Date(sorteioData.dataSorteio);
-            html += `<p style="text-align: center; color: #666; margin-bottom: 20px; border-bottom: 1px dashed #eee; padding-bottom: 15px;">Sorteio realizado em: ${data.toLocaleString('pt-BR')}</p>`;
+            html += `<p style="text-align: center; color: #666; margin-bottom: 20px;">Sorteio realizado em: ${data.toLocaleString('pt-BR')}</p>`;
         }
         
         html += '<div style="display: grid; gap: 15px;">';
@@ -701,7 +474,7 @@ document.getElementById('btnVerificarSorteio').addEventListener('click', async f
         // Check 1
         html += `
             <div style="padding: 15px; border-radius: 10px; ${erroAutoSorteio ? 'background: #f8d7da; border-left: 4px solid #dc3545;' : 'background: #d4edda; border-left: 4px solid #28a745;'}">
-                <strong>${erroAutoSorteio ? '❌' : '✅'} Ninguém tirou a si mesmo</strong>
+                <strong>${erroAutoSorteio ? '❌' : '✅'} Verificação 1: Ninguém tirou a si mesmo</strong>
                 ${erroAutoSorteio ? `<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! As seguintes pessoas tiraram a si mesmas: ${pessoasComProblema.join(', ')}</p>` : '<p style="color: #155724; margin-top: 10px;">Todos os participantes tiraram pessoas diferentes!</p>'}
             </div>
         `;
@@ -709,24 +482,24 @@ document.getElementById('btnVerificarSorteio').addEventListener('click', async f
         // Check 2
         html += `
             <div style="padding: 15px; border-radius: 10px; ${formaCirculoUnico ? 'background: #d4edda; border-left: 4px solid #28a745;' : 'background: #f8d7da; border-left: 4px solid #dc3545;'}">
-                <strong>${formaCirculoUnico ? '✅' : '❌'} Forma um Círculo Único</strong>
-                ${formaCirculoUnico ? '<p style="color: #155724; margin-top: 10px;">Perfeito! O sorteio forma um círculo completo, sem grupos isolados.</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! O sorteio forma múltiplos círculos separados, pode haver problema de quem fica no final.</p>'}
-                <p style="margin-top: 10px; color: #666;">Participantes no ciclo: ${visitados.size} de ${participantes.length}</p>
+                <strong>${formaCirculoUnico ? '✅' : '❌'} Verificação 2: Forma um círculo único</strong>
+                ${formaCirculoUnico ? '<p style="color: #155724; margin-top: 10px;">Perfeito! O sorteio forma um círculo completo.</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! O sorteio forma múltiplos círculos separados.</p>'}
+                <p style="margin-top: 10px; color: #666;">Passos visitados: ${visitados.size} de ${participantes.length}</p>
             </div>
         `;
         
         // Check 3
         html += `
             <div style="padding: 15px; border-radius: 10px; ${todosTiramAlguem ? 'background: #d4edda; border-left: 4px solid #28a745;' : 'background: #f8d7da; border-left: 4px solid #dc3545;'}">
-                <strong>${todosTiramAlguem ? '✅' : '❌'} Todos Tiram Alguém</strong>
-                ${todosTiramAlguem ? '<p style="color: #155724; margin-top: 10px;">Todos os participantes têm um amigo secreto!</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! Alguns participantes não tiraram ninguém. (Isto deve ser raro se o sorteio foi oficial)</p>'}
+                <strong>${todosTiramAlguem ? '✅' : '❌'} Verificação 3: Todos tiraram alguém</strong>
+                ${todosTiramAlguem ? '<p style="color: #155724; margin-top: 10px;">Todos os participantes têm um amigo secreto!</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! Alguns participantes não tiraram ninguém.</p>'}
             </div>
         `;
         
         // Check 4
         html += `
             <div style="padding: 15px; border-radius: 10px; ${todosSaoTirados ? 'background: #d4edda; border-left: 4px solid #28a745;' : 'background: #f8d7da; border-left: 4px solid #dc3545;'}">
-                <strong>${todosSaoTirados ? '✅' : '❌'} Todos São Tirados</strong>
+                <strong>${todosSaoTirados ? '✅' : '❌'} Verificação 4: Todos foram tirados por alguém</strong>
                 ${todosSaoTirados ? '<p style="color: #155724; margin-top: 10px;">Todos receberão um presente!</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! Alguns participantes não foram tirados por ninguém.</p>'}
             </div>
         `;
@@ -738,28 +511,28 @@ document.getElementById('btnVerificarSorteio').addEventListener('click', async f
         
         html += `
             <div style="margin-top: 25px; padding: 20px; border-radius: 10px; text-align: center; ${tudoCerto ? 'background: linear-gradient(135deg, #d4edda, #c3e6cb);' : 'background: linear-gradient(135deg, #f8d7da, #f5c6cb);'}">
-                <h3 style="margin-bottom: 10px; color: ${tudoCerto ? '#155724' : '#721c24'};">${tudoCerto ? '🎉 SORTEIO VÁLIDO!' : '⚠️ SORTEIO COM PROBLEMAS!'}</h3>
-                <p style="font-size: 1.1em; color: ${tudoCerto ? '#155724' : '#721c24'};">${tudoCerto ? 'O sorteio está perfeito e pode ser usado!' : 'Há problemas no sorteio. Recomenda-se fazer um novo sorteio!'}</p>
+                <h3 style="margin-bottom: 10px;">${tudoCerto ? '🎉 SORTEIO VÁLIDO!' : '⚠️ SORTEIO COM PROBLEMAS!'}</h3>
+                <p style="font-size: 1.1em;">${tudoCerto ? 'O sorteio está perfeito e pode ser usado!' : 'Há problemas no sorteio. Recomenda-se fazer um novo sorteio!'}</p>
             </div>
         `;
         
         // Mostrar sequência do círculo
         if (formaCirculoUnico) {
             html += '<div style="margin-top: 25px; padding: 20px; background: #f8f9fa; border-radius: 10px;">';
-            html += '<h4 style="color: var(--cor-primaria); margin-bottom: 15px; text-align: center; font-family: var(--fonte-titulo);">🔄 Sequência do Círculo</h4>';
+            html += '<h4 style="color: var(--cor-primaria); margin-bottom: 15px; text-align: center;">🔄 Sequência do Círculo</h4>';
             html += '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;">';
             
             let atual = participantes[0];
             let count = 0;
             do {
-                html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-secundaria); font-weight: 600; white-space: nowrap;">${atual}</div>`;
-                html += '<div style="font-size: 1.5em; color: #999;">→</div>';
+                html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-secundaria); font-weight: 600;">${atual}</div>`;
+                html += '<div style="font-size: 1.5em;">→</div>';
                 atual = resultado[atual].tirouNome;
                 count++;
                 if (count > participantes.length) break; // Segurança contra loop infinito
             } while (atual !== participantes[0]);
             
-            html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-sucesso); font-weight: 600; white-space: nowrap;">${participantes[0]} (Início)</div>`;
+            html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-sucesso); font-weight: 600;">${participantes[0]}</div>`;
             html += '</div></div>';
         }
         
@@ -786,8 +559,10 @@ document.getElementById('btnVerificarSorteio').addEventListener('click', async f
 // ==========================================
 
 document.getElementById('btnVerSorteio').addEventListener('click', async function() {
-    if (!isAdminLogged) {
-        showAlert('Acesso negado! Faça login como organizador.', 'error');
+    const senha = document.getElementById('senhaAdmin').value;
+    
+    if (senha !== SENHA_ADMIN) {
+        showAlert('Senha incorreta! Apenas o organizador pode ver o resultado.', 'error');
         return;
     }
 
@@ -877,7 +652,7 @@ document.getElementById('btnVerSorteio').addEventListener('click', async functio
 });
 
 // ==========================================
-// CONSULTAR AMIGO SECRETO (PARTICIPANTE)
+// CONSULTAR AMIGO SECRETO (PARTICIPANTE - SEM TELEFONE)
 // ==========================================
 
 document.getElementById('btnConsultar').addEventListener('click', async function() {
@@ -948,48 +723,15 @@ document.getElementById('codigoConsulta').addEventListener('input', function(e) 
     e.target.value = e.target.value.toUpperCase();
 });
 
-
 // ==========================================
-// APAGAR ÚLTIMO SORTEIO (ADMIN)
-// ==========================================
-
-document.getElementById('btnApagarSorteio').addEventListener('click', async function() {
-    if (!isAdminLogged) {
-        showAlert('Acesso negado! Faça login como organizador.', 'error');
-        return;
-    }
-
-    const confirmacao = confirm('⚠️ ATENÇÃO! Isso vai apagar APENAS o resultado do sorteio, permitindo que você sorteie novamente.\n\nOs participantes CADASTRADOS NÃO serão apagados. Tem certeza?');
-    
-    if (!confirmacao) {
-        return;
-    }
-
-    showLoading(true);
-
-    try {
-        await remove(ref(database, 'sorteio'));
-        
-        document.getElementById('resultadoSorteio').innerHTML = '';
-        
-        showLoading(false);
-        showAlert('✅ Último sorteio apagado com sucesso! Você já pode realizar um novo sorteio.', 'success');
-        
-    } catch (error) {
-        showLoading(false);
-        showAlert('Erro ao apagar sorteio: ' + error.message, 'error');
-        console.error(error);
-    }
-});
-
-
-// ==========================================
-// LIMPAR TODOS OS DADOS (ADMIN)
+// LIMPAR DADOS
 // ==========================================
 
 document.getElementById('btnLimpar').addEventListener('click', async function() {
-    if (!isAdminLogged) {
-        showAlert('Acesso negado! Faça login como organizador.', 'error');
+    const senha = document.getElementById('senhaAdmin').value;
+    
+    if (senha !== SENHA_ADMIN) {
+        showAlert('Senha incorreta! Apenas o organizador pode limpar os dados.', 'error');
         return;
     }
 
@@ -1006,7 +748,6 @@ document.getElementById('btnLimpar').addEventListener('click', async function() 
         await remove(ref(database, 'sorteio'));
         
         document.getElementById('resultadoSorteio').innerHTML = '';
-        document.getElementById('listaAdminParticipantes').innerHTML = '';
         
         showLoading(false);
         showAlert('✅ Todos os dados foram removidos com sucesso!', 'success');
@@ -1017,4 +758,3 @@ document.getElementById('btnLimpar').addEventListener('click', async function() 
         console.error(error);
     }
 });
-
