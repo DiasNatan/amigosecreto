@@ -588,6 +588,169 @@ document.getElementById('btnSortear').addEventListener('click', async function()
 });
 
 // ==========================================
+// VERIFICAR INTEGRIDADE DO SORTEIO (ADMIN)
+// ==========================================
+
+document.getElementById('btnVerificarSorteio').addEventListener('click', async function() {
+    if (!isAdminLogged) {
+        showAlert('Acesso negado! Faça login como organizador.', 'error');
+        return;
+    }
+
+    showLoading(true);
+
+    try {
+        const snapshot = await new Promise((resolve) => {
+            onValue(ref(database, 'sorteio'), resolve, { onlyOnce: true });
+        });
+        
+        const sorteioData = snapshot.val();
+        
+        if (!sorteioData || !sorteioData.resultado) {
+            showLoading(false);
+            showAlert('Nenhum sorteio foi realizado ainda!', 'info');
+            return;
+        }
+
+        const resultado = sorteioData.resultado;
+        const participantes = Object.keys(resultado);
+        
+        // VERIFICAÇÃO 1: Ninguém tirou a si mesmo
+        let erroAutoSorteio = false;
+        let pessoasComProblema = [];
+        
+        for (const pessoa of participantes) {
+            if (pessoa === resultado[pessoa].tirouNome) {
+                erroAutoSorteio = true;
+                pessoasComProblema.push(pessoa);
+            }
+        }
+        
+        // VERIFICAÇÃO 2: Formar círculo único
+        const visitados = new Set();
+        let atual = participantes[0];
+        let passos = 0;
+        let formaCirculoUnico = true;
+        
+        while (passos < participantes.length) {
+            visitados.add(atual);
+            atual = resultado[atual].tirouNome;
+            passos++;
+            
+            if (atual === participantes[0]) {
+                // Voltou ao início
+                if (visitados.size !== participantes.length) {
+                    formaCirculoUnico = false;
+                }
+                break;
+            }
+        }
+        
+        // VERIFICAÇÃO 3: Todos os participantes têm um amigo secreto (sempre true se não houver erro no sorteio)
+        let todosTiramAlguem = participantes.every(p => resultado[p].tirouNome);
+        
+        // VERIFICAÇÃO 4: Todos são tirados por alguém
+        const tirados = new Set(participantes.map(p => resultado[p].tirouNome));
+        let todosSaoTirados = participantes.every(p => tirados.has(p));
+        
+        // Gerar relatório visual
+        const resultadoDiv = document.getElementById('resultadoSorteio');
+        
+        let html = '<div style="background: white; padding: 25px; border-radius: 15px; margin-top: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1);">';
+        html += '<h4 style="color: var(--cor-primaria); margin-bottom: 20px; text-align: center; font-family: var(--fonte-titulo);">📊 Relatório de Verificação do Sorteio</h4>';
+        
+        // Data do sorteio
+        if (sorteioData.dataSorteio) {
+            const data = new Date(sorteioData.dataSorteio);
+            html += `<p style="text-align: center; color: #666; margin-bottom: 20px; border-bottom: 1px dashed #eee; padding-bottom: 15px;">Sorteio realizado em: ${data.toLocaleString('pt-BR')}</p>`;
+        }
+        
+        html += '<div style="display: grid; gap: 15px;">';
+        
+        // Check 1
+        html += `
+            <div style="padding: 15px; border-radius: 10px; ${erroAutoSorteio ? 'background: #f8d7da; border-left: 4px solid #dc3545;' : 'background: #d4edda; border-left: 4px solid #28a745;'}">
+                <strong>${erroAutoSorteio ? '❌' : '✅'} Ninguém tirou a si mesmo</strong>
+                ${erroAutoSorteio ? `<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! As seguintes pessoas tiraram a si mesmas: ${pessoasComProblema.join(', ')}</p>` : '<p style="color: #155724; margin-top: 10px;">Todos os participantes tiraram pessoas diferentes!</p>'}
+            </div>
+        `;
+        
+        // Check 2
+        html += `
+            <div style="padding: 15px; border-radius: 10px; ${formaCirculoUnico ? 'background: #d4edda; border-left: 4px solid #28a745;' : 'background: #f8d7da; border-left: 4px solid #dc3545;'}">
+                <strong>${formaCirculoUnico ? '✅' : '❌'} Forma um Círculo Único</strong>
+                ${formaCirculoUnico ? '<p style="color: #155724; margin-top: 10px;">Perfeito! O sorteio forma um círculo completo, sem grupos isolados.</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! O sorteio forma múltiplos círculos separados, pode haver problema de quem fica no final.</p>'}
+                <p style="margin-top: 10px; color: #666;">Participantes no ciclo: ${visitados.size} de ${participantes.length}</p>
+            </div>
+        `;
+        
+        // Check 3
+        html += `
+            <div style="padding: 15px; border-radius: 10px; ${todosTiramAlguem ? 'background: #d4edda; border-left: 4px solid #28a745;' : 'background: #f8d7da; border-left: 4px solid #dc3545;'}">
+                <strong>${todosTiramAlguem ? '✅' : '❌'} Todos Tiram Alguém</strong>
+                ${todosTiramAlguem ? '<p style="color: #155724; margin-top: 10px;">Todos os participantes têm um amigo secreto!</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! Alguns participantes não tiraram ninguém. (Isto deve ser raro se o sorteio foi oficial)</p>'}
+            </div>
+        `;
+        
+        // Check 4
+        html += `
+            <div style="padding: 15px; border-radius: 10px; ${todosSaoTirados ? 'background: #d4edda; border-left: 4px solid #28a745;' : 'background: #f8d7da; border-left: 4px solid #dc3545;'}">
+                <strong>${todosSaoTirados ? '✅' : '❌'} Todos São Tirados</strong>
+                ${todosSaoTirados ? '<p style="color: #155724; margin-top: 10px;">Todos receberão um presente!</p>' : '<p style="color: #721c24; margin-top: 10px;">⚠️ ERRO! Alguns participantes não foram tirados por ninguém.</p>'}
+            </div>
+        `;
+        
+        html += '</div>';
+        
+        // Resumo final
+        const tudoCerto = !erroAutoSorteio && formaCirculoUnico && todosTiramAlguem && todosSaoTirados;
+        
+        html += `
+            <div style="margin-top: 25px; padding: 20px; border-radius: 10px; text-align: center; ${tudoCerto ? 'background: linear-gradient(135deg, #d4edda, #c3e6cb);' : 'background: linear-gradient(135deg, #f8d7da, #f5c6cb);'}">
+                <h3 style="margin-bottom: 10px; color: ${tudoCerto ? '#155724' : '#721c24'};">${tudoCerto ? '🎉 SORTEIO VÁLIDO!' : '⚠️ SORTEIO COM PROBLEMAS!'}</h3>
+                <p style="font-size: 1.1em; color: ${tudoCerto ? '#155724' : '#721c24'};">${tudoCerto ? 'O sorteio está perfeito e pode ser usado!' : 'Há problemas no sorteio. Recomenda-se fazer um novo sorteio!'}</p>
+            </div>
+        `;
+        
+        // Mostrar sequência do círculo
+        if (formaCirculoUnico) {
+            html += '<div style="margin-top: 25px; padding: 20px; background: #f8f9fa; border-radius: 10px;">';
+            html += '<h4 style="color: var(--cor-primaria); margin-bottom: 15px; text-align: center; font-family: var(--fonte-titulo);">🔄 Sequência do Círculo</h4>';
+            html += '<div style="display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; align-items: center;">';
+            
+            let atual = participantes[0];
+            let count = 0;
+            do {
+                html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-secundaria); font-weight: 600; white-space: nowrap;">${atual}</div>`;
+                html += '<div style="font-size: 1.5em; color: #999;">→</div>';
+                atual = resultado[atual].tirouNome;
+                count++;
+                if (count > participantes.length) break; // Segurança contra loop infinito
+            } while (atual !== participantes[0]);
+            
+            html += `<div style="background: white; padding: 10px 15px; border-radius: 8px; border: 2px solid var(--cor-sucesso); font-weight: 600; white-space: nowrap;">${participantes[0]} (Início)</div>`;
+            html += '</div></div>';
+        }
+        
+        html += '</div>';
+        
+        resultadoDiv.innerHTML = html;
+        showLoading(false);
+        
+        if (tudoCerto) {
+            showAlert('✅ Sorteio verificado! Está tudo correto!', 'success');
+        } else {
+            showAlert('⚠️ Problemas detectados no sorteio! Veja o relatório abaixo.', 'error');
+        }
+        
+    } catch (error) {
+        showLoading(false);
+        showAlert('Erro ao verificar sorteio: ' + error.message, 'error');
+        console.error(error);
+    }
+});
+
+// ==========================================
 // VER RESULTADO DO SORTEIO (ADMIN - COM CÓDIGOS E WHATSAPP)
 // ==========================================
 
