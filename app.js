@@ -1,3 +1,5 @@
+--- START OF FILE app.js ---
+
 // ==========================================
 // IMPORTAÇÕES
 // ==========================================
@@ -387,16 +389,17 @@ if (edicaoForm) {
 
 
 // ==========================================
-// ACESSO AO PAINEL ADMIN (LOGIN/LOGOUT) - FINAL
+// ACESSO AO PAINEL ADMIN (LOGIN/LOGOUT) - CORRIGIDO
 // ==========================================
 
 const btnAcessoAdmin = document.getElementById('btnAcessoAdmin');
 if (btnAcessoAdmin) {
     btnAcessoAdmin.addEventListener('click', function() {
         const senhaEl = document.getElementById('senhaAdmin');
-        const senha = senhaEl ? senhaEl.value : '';
+        const senhaDigitada = senhaEl ? senhaEl.value.trim() : ''; // .trim() garante que espaços extras não quebrem
+        const senhaCorreta = SENHA_ADMIN.trim(); // .trim() na senha correta para garantir
         
-        if (senha === SENHA_ADMIN) {
+        if (senhaDigitada === senhaCorreta) {
             isAdminLogged = true; // Define o estado de login
             
             const adminLoginCard = document.getElementById('adminLoginCard');
@@ -540,7 +543,7 @@ function realizarSorteio(participantes) {
 }
 
 // ==========================================
-// BOTÃO DE SORTEAR TESTE (NÃO SALVA NO FIREBASE) - CORRIGIDO
+// BOTÃO DE SORTEAR TESTE (NÃO SALVA NO FIREBASE)
 // ==========================================
 
 const btnSortearTeste = document.getElementById('btnSortearTeste');
@@ -551,7 +554,73 @@ if (btnSortearTeste) {
             return;
         }
 
-        // ... (RESTANTE MANTIDO)
+        showLoading(true);
+
+        try {
+            const snapshot = await new Promise((resolve) => {
+                onValue(ref(database, 'participantes'), resolve, { once: true });
+            });
+            
+            const participantes = snapshot.val();
+            
+            if (!participantes || Object.keys(participantes).length < 2) {
+                showLoading(false);
+                showAlert('É necessário pelo menos 2 participantes para realizar o sorteio!', 'error');
+                return;
+            }
+
+            const { resultado } = realizarSorteio(participantes);
+            
+            // Buscar dados dos participantes para pegar os telefones
+            const telefonesPorNome = {};
+            if (participantes) {
+                Object.values(participantes).forEach(p => {
+                    telefonesPorNome[p.nome] = p.whatsapp;
+                });
+            }
+
+            const resultadoDiv = document.getElementById('resultadoSorteio');
+            const urlSite = window.location.href.split('?')[0];
+            
+            let html = '<div style="background: linear-gradient(135deg, #fff3cd, #ffeaa7); padding: 20px; border-radius: 12px; border: 3px dashed #ff9800; margin-bottom: 20px;">';
+            html += '<h4 style="color: #ff6f00; margin-bottom: 10px;">🧪 SORTEIO DE TESTE (NÃO SALVO)</h4>';
+            html += '<p style="color: #e65100; font-weight: 600;">⚠️ Este é apenas um teste! Os códigos abaixo NÃO foram salvos e NÃO funcionarão na consulta.</p>';
+            html += '<p style="color: #e65100;">Use o botão "Sorteio Oficial" quando estiver pronto para realizar o sorteio definitivo.</p>';
+            html += '</div>';
+            
+            html += '<h4 style="color: var(--cor-detalhe); margin-top: 20px;">📋 Prévia dos Códigos:</h4>';
+            
+            for (const [pessoa, dados] of Object.entries(resultado)) {
+                const telefone = telefonesPorNome[pessoa];
+                const telefoneNumeros = telefone ? telefone.replace(/\D/g, '') : '';
+                
+                const mensagem = `🎁 *Olá, ${pessoa}!*%0A%0ASeu código do Amigo Secreto é:%0A%0A*${dados.codigo}*%0A%0AUse este código no site para descobrir quem você tirou!%0A%0A🔗 Acesse: ${urlSite}%0A%0A🎉 Boa sorte e capriche no presente!`;
+                const linkWhatsApp = telefone ? `https://wa.me/55${telefoneNumeros}?text=${mensagem}` : '#';
+                
+                html += `
+                    <div class="sorteio-resultado" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap; opacity: 0.7;">
+                        <div style="flex: 1; min-width: 200px;">
+                            <strong>👤 ${pessoa}</strong><br>
+                            <strong style="color: #ff9800; font-size: 1.2em;">🔑 ${dados.codigo}</strong>
+                        </div>
+                        ${telefone ? `
+                            <button disabled style="background: #ccc; color: #666; padding: 12px 25px; border-radius: 50px; border: none; cursor: not-allowed;">
+                                📱 Teste (Desabilitado)
+                            </button>
+                        ` : '<span style="color: #999;">Sem WhatsApp</span>'}
+                    </div>
+                `;
+            }
+            
+            if (resultadoDiv) resultadoDiv.innerHTML = html;
+            showLoading(false);
+            showAlert('🧪 Sorteio de TESTE gerado! Este sorteio NÃO foi salvo. Use "Sorteio Oficial" quando estiver pronto.', 'info');
+            
+        } catch (error) {
+            showLoading(false);
+            showAlert('Erro ao realizar sorteio de teste: ' + (error.message || error), 'error');
+            console.error(error);
+        }
     });
 }
 
@@ -835,7 +904,7 @@ if (btnVerSorteio) {
                 const linkWhatsApp = telefone ? `https://wa.me/55${telefoneNumeros}?text=${mensagem}` : '#';
                 
                 html += `
-                    <div class="sorteio-resultado" style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; gap: 15px; flex-wrap: wrap;" class="sorteio-resultado">
                         <div style="flex: 1; min-width: 200px;">
                             <strong>👤 ${pessoa}</strong><br>
                             <strong style="color: #4CAF50; font-size: 1.2em;">🔑 ${dados.codigo}</strong>
@@ -956,7 +1025,6 @@ if (codigoConsultaEl) {
 // ==========================================
 // APAGAR ÚLTIMO SORTEIO (ADMIN)
 // ==========================================
-
 const btnApagarSorteio = document.getElementById('btnApagarSorteio');
 if (btnApagarSorteio) {
     btnApagarSorteio.addEventListener('click', async function() {
@@ -964,6 +1032,7 @@ if (btnApagarSorteio) {
             showAlert('Acesso negado! Faça login como organizador.', 'error');
             return;
         }
+
         const confirmacao = confirm('⚠️ ATENÇÃO! Isso vai apagar APENAS o resultado do sorteio, permitindo que você sorteie novamente.\n\nOs participantes CADASTRADOS NÃO serão apagados. Tem certeza?');
         
         if (!confirmacao) {
@@ -1037,7 +1106,6 @@ if (btnLimpar) {
     const adminLogin = document.getElementById('adminLoginCard');
 
     // Se painel existir, garantir que esteja oculto inicialmente
-// Se painel existir, garantir que esteja oculto inicialmente
     if (adminPanel) adminPanel.classList.add('hidden');
     // Login deve estar visível
     if (adminLogin) adminLogin.classList.remove('hidden');
